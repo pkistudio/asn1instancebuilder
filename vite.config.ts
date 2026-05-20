@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+
+const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version: string };
 
 export default defineConfig({
   build: {
@@ -21,6 +25,6 @@ export default defineConfig({
     }
   },
   define: {
-    __ASN1_INSTANCE_BUILDER_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0')
+    __ASN1_INSTANCE_BUILDER_VERSION__: JSON.stringify(packageJson.version)
   }
 });
