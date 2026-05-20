@@ -149,7 +149,6 @@ function renderShell(): string {
           <button type="button" disabled>Save</button>
         </nav>
         <div class="asn1ib-left-card">
-          <div class="asn1ib-card-title">ASN.1 Definition or Schema Model</div>
           <textarea data-role="definition" spellcheck="false"></textarea>
           <p class="asn1ib-status" data-role="status"></p>
         </div>
