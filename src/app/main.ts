@@ -28,6 +28,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
+  const workspace = mustFind<HTMLElement>(mount, '[data-role="workspace"]');
+  const workspaceResizer = mustFind<HTMLElement>(mount, '[data-role="workspace-resizer"]');
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
@@ -42,6 +44,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   let input: unknown = options.input ?? exampleInput;
   const apiLogEntries: ApiLogEntry[] = [];
 
+  initializeWorkspaceResizer(mount, workspace, workspaceResizer);
   initializeApiLogResizer(mount, apiLogResizer);
 
   const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
@@ -146,7 +149,7 @@ function renderShell(): string {
       <strong>ASN.1 Instance Builder</strong>
       <button type="button" data-role="about">About</button>
     </nav>
-    <main class="asn1ib-workspace">
+    <main class="asn1ib-workspace" data-role="workspace">
       <section class="asn1ib-panel asn1ib-definition-panel">
         <nav class="asn1ib-pane-menu" aria-label="Definition actions">
           <button type="button" disabled>Load</button>
@@ -158,18 +161,27 @@ function renderShell(): string {
           <p class="asn1ib-notice asn1ib-definition-status" data-role="definition-status">Definition input is ready.</p>
         </div>
       </section>
-      <section class="asn1ib-panel">
-        <div class="asn1ib-panel-title">
-          <span>Instance Input</span>
-          <button type="button" data-role="build">Build DER</button>
-        </div>
-        <div class="asn1ib-instance-controls">
-          <select data-role="type" aria-label="ASN.1 type"></select>
-        </div>
-        <textarea data-role="input" spellcheck="false"></textarea>
-        <div class="asn1ib-output-label">Diagnostics</div>
-        <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
-        <p class="asn1ib-notice asn1ib-build-status" data-role="build-status" aria-live="polite">Build status is ready.</p>
+      <div data-role="workspace-resizer" class="asn1ib-workspace-resizer" role="separator" aria-label="Resize definition pane" aria-orientation="vertical" tabindex="0"></div>
+      <section class="asn1ib-right-stack">
+        <section class="asn1ib-panel asn1ib-instance-panel">
+          <div class="asn1ib-panel-title">
+            <span>Instance Input</span>
+            <button type="button" data-role="build">Build DER</button>
+          </div>
+          <div class="asn1ib-instance-controls">
+            <select data-role="type" aria-label="ASN.1 type"></select>
+          </div>
+          <textarea data-role="input" spellcheck="false"></textarea>
+        </section>
+        <section class="asn1ib-diagnostics-panel">
+          <nav class="asn1ib-pane-menu asn1ib-diagnostics-menu" aria-label="Diagnostics pane">
+            <span>Diagnostics</span>
+          </nav>
+          <div class="asn1ib-diagnostics-card">
+            <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
+            <p class="asn1ib-notice asn1ib-build-status" data-role="build-status" aria-live="polite">Build status is ready.</p>
+          </div>
+        </section>
       </section>
     </main>
     <div data-role="api-log-resizer" class="asn1ib-api-log-resizer" role="separator" aria-label="Resize API log" aria-orientation="horizontal" tabindex="0"></div>
@@ -296,6 +308,52 @@ function renderApiLog(container: HTMLElement, entries: ApiLogEntry[]): void {
     container.append(item);
   }
   container.scrollTop = container.scrollHeight;
+}
+
+function initializeWorkspaceResizer(root: HTMLElement, workspace: HTMLElement, resizer: HTMLElement): void {
+  const minWidth = 260;
+  const minRightWidth = 360;
+  let startX = 0;
+  let startWidth = 0;
+
+  const stopResize = () => {
+    root.classList.remove('resizing-columns');
+    document.removeEventListener('pointermove', resize);
+    document.removeEventListener('pointerup', stopResize);
+  };
+
+  const resize = (event: PointerEvent) => {
+    setDefinitionPaneWidth(workspace, startWidth + event.clientX - startX, minWidth, minRightWidth);
+  };
+
+  resizer.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    startX = event.clientX;
+    startWidth = getDefinitionPaneWidth(workspace);
+    root.classList.add('resizing-columns');
+    document.addEventListener('pointermove', resize);
+    document.addEventListener('pointerup', stopResize, { once: true });
+  });
+
+  resizer.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' ? 16 : -16;
+    setDefinitionPaneWidth(workspace, getDefinitionPaneWidth(workspace) + delta, minWidth, minRightWidth);
+  });
+}
+
+function getDefinitionPaneWidth(workspace: HTMLElement): number {
+  const definitionPane = workspace.firstElementChild;
+  if (definitionPane instanceof HTMLElement) return definitionPane.getBoundingClientRect().width;
+  return Number.parseFloat(getComputedStyle(workspace).getPropertyValue('--definition-pane-width')) || 340;
+}
+
+function setDefinitionPaneWidth(workspace: HTMLElement, width: number, minWidth: number, minRightWidth: number): void {
+  const bounds = workspace.getBoundingClientRect();
+  const maxWidth = Math.max(minWidth, bounds.width - minRightWidth - 18);
+  const nextWidth = clamp(width, minWidth, maxWidth);
+  workspace.style.setProperty('--definition-pane-width', `${nextWidth}px`);
 }
 
 function initializeApiLogResizer(root: HTMLElement, resizer: HTMLElement): void {
