@@ -140,7 +140,7 @@ textarea {
 
 .asn1ib-workspace {
   display: grid;
-  grid-template-columns: minmax(260px, 0.95fr) minmax(280px, 0.9fr) minmax(320px, 1.15fr);
+  grid-template-columns: minmax(300px, 0.95fr) minmax(420px, 1.25fr);
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--panel-border);
@@ -192,6 +192,11 @@ textarea {
   padding: 6px;
   background: var(--window);
   overflow: hidden;
+}
+
+.asn1ib-left-card textarea {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .asn1ib-panel-title,
@@ -279,34 +284,16 @@ textarea {
   border-left-color: #a16207;
 }
 
-.asn1ib-viewer-panel {
-  grid-template-rows: auto auto 1fr;
-  border-right: 0;
-}
-
-.asn1ib-viewer-notice {
-  min-height: 20px;
-  padding: 5px 10px;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
-  color: var(--muted);
-  background: var(--window);
-  font-size: 12px;
-}
-
-.asn1ib-viewer {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .asn1ib-status {
   flex: 0 0 auto;
   width: 100%;
-  min-height: 0;
+  min-height: 34px;
   margin: 0;
-  border: 0;
-  padding: 0;
+  border: 1px solid var(--subtle-border);
+  border-radius: 3px;
+  padding: 6px 7px;
   color: var(--muted);
+  background: var(--panel);
   font-size: 12px;
   line-height: 1.35;
 }

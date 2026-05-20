@@ -14,3 +14,18 @@ declare module '@pkistudio/pkistudiojs/viewer' {
 declare module '@pkistudio/pkistudiojs/oid-resolver' {
   export function create(overrides?: Record<string, string>): unknown;
 }
+
+declare module '@pkistudio/pkistudiojs/core?url' {
+  const url: string;
+  export default url;
+}
+
+declare module '@pkistudio/pkistudiojs/viewer?url' {
+  const url: string;
+  export default url;
+}
+
+declare module '@pkistudio/pkistudiojs/oid-resolver?url' {
+  const url: string;
+  export default url;
+}

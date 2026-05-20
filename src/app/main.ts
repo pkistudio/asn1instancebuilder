@@ -1,4 +1,7 @@
 import { bytesToHex, createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
+import oidResolverScriptUrl from '@pkistudio/pkistudiojs/oid-resolver?url';
+import pkistudioCoreScriptUrl from '@pkistudio/pkistudiojs/core?url';
+import pkistudioViewerScriptUrl from '@pkistudio/pkistudiojs/viewer?url';
 
 declare const __ASN1_INSTANCE_BUILDER_VERSION__: string;
 
@@ -9,7 +12,7 @@ export interface Asn1InstanceBuilderAppOptions {
 }
 
 export interface Asn1InstanceBuilderApp {
-  build(): Promise<void>;
+  build(openViewerWindow?: boolean): Promise<void>;
   loadSchema(schema: Asn1SchemaModule): void;
   loadInput(input: unknown): void;
 }
@@ -31,12 +34,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
-  const viewerNotice = mustFind<HTMLElement>(mount, '[data-role="viewer-notice"]');
-  const viewerMount = mustFind<HTMLElement>(mount, '[data-role="viewer"]');
 
   let schema = options.schema ?? exampleSchema;
   let input: unknown = options.input ?? exampleInput;
-  let viewer: { loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null = null;
   const apiLogEntries: ApiLogEntry[] = [];
 
   initializeApiLogResizer(mount, apiLogResizer);
@@ -55,7 +55,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   };
 
   const app: Asn1InstanceBuilderApp = {
-    async build() {
+    async build(openViewerWindow = true) {
       let handledDiagnosticError = false;
       appendApiLog(apiLog, apiLogEntries, { level: 'info', label: 'build', detail: 'Build DER requested.' });
       try {
@@ -91,17 +91,16 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         outputText.value = bytesToHex(document.der);
         const warningCount = [...schemaDiagnostics, ...instanceDiagnostics].filter((diagnostic) => diagnostic.severity === 'warning').length;
         status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
-        viewer ??= await initViewer(viewerMount);
-        viewer?.loadBytes(document.der, `Loaded ${document.typeName} from ASN.1 Instance Builder.`);
-        appendApiLog(apiLog, apiLogEntries, { level: viewer ? 'success' : 'warning', label: 'viewer.loadBytes', detail: viewer ? `Loaded ${document.der.byteLength} bytes into PkiStudioJS Viewer.` : 'PkiStudioJS Viewer is not available.' });
-        viewerNotice.textContent = `Viewer loaded ${document.typeName}.`;
+        if (openViewerWindow) {
+          const opened = openPkiStudioViewerWindow(document.der, document.typeName);
+          appendApiLog(apiLog, apiLogEntries, { level: opened ? 'success' : 'warning', label: 'openPkiStudioWindow', detail: opened ? `Opened a new PkiStudioJS tab for ${document.typeName}.` : 'The browser blocked the PkiStudioJS window.' });
+        }
         await parseGeneratedDer(document.der);
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseGeneratedDer', detail: 'PkiStudioJS core parsed the generated DER.' });
       } catch (error) {
         appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'build-error', detail: error instanceof Error ? error.message : String(error) });
         outputText.value = '';
         status.textContent = error instanceof Error ? error.message : String(error);
-        viewerNotice.textContent = viewer ? 'Viewer shows the last successfully built DER.' : 'Viewer will load after a successful build.';
         if (!handledDiagnosticError) {
           renderDiagnostics(diagnosticsList, [{ title: 'Build', diagnostics: [diagnosticFromError(error)] }]);
         }
@@ -126,7 +125,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   definitionText.value = exampleDefinition;
   refreshTypeSelect();
   app.loadInput(input);
-  void app.build();
+  void app.build(false);
   return app;
 }
 
@@ -158,16 +157,11 @@ function renderShell(): string {
         <div class="asn1ib-output-label">Diagnostics</div>
         <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
       </section>
-      <section class="asn1ib-panel asn1ib-viewer-panel">
-        <div class="asn1ib-panel-title">PkiStudioJS Viewer</div>
-        <div data-role="viewer-notice" class="asn1ib-viewer-notice"></div>
-        <div data-role="viewer" class="asn1ib-viewer"></div>
-      </section>
     </main>
     <div data-role="api-log-resizer" class="asn1ib-api-log-resizer" role="separator" aria-label="Resize API log" aria-orientation="horizontal" tabindex="0"></div>
     <section class="asn1ib-log-panel" aria-label="API call log">
       <div class="asn1ib-api-log-header">
-        <button type="button" data-role="clear-api-log">Clear API Log</button>
+        <button type="button" data-role="clear-api-log">Clear</button>
       </div>
       <ol data-role="api-log" class="asn1ib-api-log"></ol>
     </section>
@@ -328,17 +322,59 @@ function diagnosticFromError(error: unknown): AppDiagnostic {
   };
 }
 
-async function initViewer(mount: HTMLElement): Promise<{ loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null> {
-  try {
-    const viewer = await import('@pkistudio/pkistudiojs/viewer');
-    const oidResolver = await import('@pkistudio/pkistudiojs/oid-resolver');
-    const instance = viewer.init({ mount, editable: false, oidResolver: oidResolver.create() });
-    instance.setEditable(false);
-    return instance;
-  } catch (error) {
-    mount.textContent = error instanceof Error ? error.message : String(error);
-    return null;
+function openPkiStudioViewerWindow(bytes: Uint8Array, typeName: string): boolean {
+  const coreUrl = new URL(pkistudioCoreScriptUrl, window.location.href).href;
+  const oidResolverUrl = new URL(oidResolverScriptUrl, window.location.href).href;
+  const viewerUrl = new URL(pkistudioViewerScriptUrl, window.location.href).href;
+  const byteArray = Array.from(bytes).join(',');
+  const title = `PkiStudioJS - ${typeName}`;
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      html, body, #pkistudio { width: 100%; height: 100%; margin: 0; min-height: 0; overflow: hidden; }
+    </style>
+    <script src="${coreUrl}"></script>
+    <script src="${oidResolverUrl}"></script>
+    <script src="${viewerUrl}" data-pkistudio-auto-init="false"></script>
+  </head>
+  <body>
+    <div id="pkistudio" data-pkistudio-mount></div>
+    <script>
+      const bytes = new Uint8Array([${byteArray}]);
+      const resolver = window.PkiStudioOidResolver && window.PkiStudioOidResolver.create ? window.PkiStudioOidResolver.create() : undefined;
+      const instance = window.PkiStudio.init({ mount: document.getElementById('pkistudio'), fullscreen: true, oidResolver: resolver });
+      instance.loadBytes(bytes, 'Loaded ${escapeJavaScriptString(typeName)} from ASN.1 Instance Builder.');
+      document.title = '${escapeJavaScriptString(title)}';
+    </script>
+  </body>
+</html>`;
+  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const childWindow = window.open(blobUrl, '_blank');
+  if (!childWindow) {
+    URL.revokeObjectURL(blobUrl);
+    return false;
   }
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  return true;
+}
+
+function escapeHtml(input: string): string {
+  return input.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char] ?? char);
+}
+
+function escapeJavaScriptString(input: string): string {
+  return input.replace(/[\\'\n\r\u2028\u2029]/g, (char) => {
+    if (char === '\\') return '\\\\';
+    if (char === "'") return "\\'";
+    if (char === '\n') return '\\n';
+    if (char === '\r') return '\\r';
+    if (char === '\u2028') return '\\u2028';
+    return '\\u2029';
+  });
 }
 
 function mustFind<T extends Element>(root: ParentNode, selector: string): T {

@@ -181,8 +181,9 @@ allow the generated value to be inspected.
 
 The app shell includes a resizable bottom API log pane, styled like the PKI
 Studio gadget apps, that records schema parsing, diagnostics, DER building,
-PkiStudioJS Viewer loading, and generated DER parsing results for each build
-attempt.
+PkiStudioJS window opening, and generated DER parsing results for each build
+attempt. Successful builds open a new full PkiStudioJS browser tab for the
+generated DER; failed builds do not open a viewer tab.
 
 The checked-in fixtures include PKI-oriented component examples for
 `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`,
