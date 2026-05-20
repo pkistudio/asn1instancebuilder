@@ -31,7 +31,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
-  const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
+  const definitionStatus = mustFind<HTMLElement>(mount, '[data-role="definition-status"]');
+  const buildStatus = mustFind<HTMLElement>(mount, '[data-role="build-status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
   const aboutButton = mustFind<HTMLButtonElement>(mount, '[data-role="about"]');
   const aboutDialog = mustFind<HTMLDialogElement>(mount, '[data-role="about-dialog"]');
@@ -63,10 +64,14 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       try {
         schema = parseDefinitionInput(definitionText.value);
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseAsn1Definition', detail: `Loaded ${schema.types.length} type${schema.types.length === 1 ? '' : 's'} from the definition input.` });
+        definitionStatus.textContent = `Loaded ${schema.types.length} ASN.1 type${schema.types.length === 1 ? '' : 's'} from the definition.`;
         refreshTypeSelect();
         const schemaDiagnostics = validateSchemaModule(schema);
         appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'validateSchemaModule', detail: formatDiagnosticSummary(schemaDiagnostics) });
         renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
+        if (schemaDiagnostics.length > 0) {
+          definitionStatus.textContent = `Definition diagnostics: ${formatDiagnosticSummary(schemaDiagnostics)}`;
+        }
         if (hasDiagnosticErrors(schemaDiagnostics)) {
           handledDiagnosticError = true;
           throw new Error('Schema diagnostics contain errors. Fix them before building DER.');
@@ -89,7 +94,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         const document = createInstance(schema, typeName, input);
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'createInstance', detail: `${document.typeName}: ${document.der.byteLength} DER bytes.` });
         const warningCount = [...schemaDiagnostics, ...instanceDiagnostics].filter((diagnostic) => diagnostic.severity === 'warning').length;
-        status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
+        buildStatus.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
         if (openViewerWindow) {
           const opened = openPkiStudioViewerWindow(document.der, document.typeName);
           appendApiLog(apiLog, apiLogEntries, { level: opened ? 'success' : 'warning', label: 'openPkiStudioWindow', detail: opened ? `Opened a new PkiStudioJS tab for ${document.typeName}.` : 'The browser blocked the PkiStudioJS window.' });
@@ -98,7 +103,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseGeneratedDer', detail: 'PkiStudioJS core parsed the generated DER.' });
       } catch (error) {
         appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'build-error', detail: error instanceof Error ? error.message : String(error) });
-        status.textContent = error instanceof Error ? error.message : String(error);
+        buildStatus.textContent = error instanceof Error ? error.message : String(error);
         if (!handledDiagnosticError) {
           renderDiagnostics(diagnosticsList, [{ title: 'Build', diagnostics: [diagnosticFromError(error)] }]);
         }
@@ -144,13 +149,13 @@ function renderShell(): string {
     <main class="asn1ib-workspace">
       <section class="asn1ib-panel asn1ib-definition-panel">
         <nav class="asn1ib-pane-menu" aria-label="Definition actions">
-          <button type="button" disabled>New</button>
-          <button type="button" disabled>Open</button>
+          <button type="button" disabled>Load</button>
           <button type="button" disabled>Save</button>
+          <button type="button" disabled>Close</button>
         </nav>
         <div class="asn1ib-left-card">
           <textarea data-role="definition" spellcheck="false"></textarea>
-          <p class="asn1ib-status" data-role="status"></p>
+          <p class="asn1ib-notice asn1ib-definition-status" data-role="definition-status">Definition input is ready.</p>
         </div>
       </section>
       <section class="asn1ib-panel">
@@ -164,6 +169,7 @@ function renderShell(): string {
         <textarea data-role="input" spellcheck="false"></textarea>
         <div class="asn1ib-output-label">Diagnostics</div>
         <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
+        <p class="asn1ib-notice asn1ib-build-status" data-role="build-status" aria-live="polite">Build status is ready.</p>
       </section>
     </main>
     <div data-role="api-log-resizer" class="asn1ib-api-log-resizer" role="separator" aria-label="Resize API log" aria-orientation="horizontal" tabindex="0"></div>
