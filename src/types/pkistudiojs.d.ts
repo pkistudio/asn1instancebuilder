@@ -8,11 +8,24 @@ declare module '@pkistudio/pkistudiojs/viewer' {
     setEditable(editable: boolean): void;
   }
 
+  export interface ViewerApi {
+    init(options: Record<string, unknown>): ViewerInstance;
+    version?: string;
+  }
+
   export function init(options: Record<string, unknown>): ViewerInstance;
+  const PkiStudio: ViewerApi;
+  export default PkiStudio;
 }
 
 declare module '@pkistudio/pkistudiojs/oid-resolver' {
+  export interface OidResolverApi {
+    create(overrides?: Record<string, string>): unknown;
+  }
+
   export function create(overrides?: Record<string, string>): unknown;
+  const PkiStudioOidResolver: OidResolverApi;
+  export default PkiStudioOidResolver;
 }
 
 declare module '@pkistudio/pkistudiojs/core?url' {
