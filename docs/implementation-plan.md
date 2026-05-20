@@ -25,8 +25,8 @@ with browser and Webview hosts.
 6. Expand schema diagnostics.
    `validateSchemaModule()` now returns structured diagnostics for duplicate type names, unknown type references, duplicate field names, duplicate context-specific tags, unsupported tag numbers, and duplicate named numbers. Next, connect diagnostics to the browser UI and parser recovery paths.
 
-7. Add instance diagnostics.
-   Provide validation results with stable paths such as `tbsCertificate.serialNumber` instead of only throwing errors during DER generation.
+7. Expand instance diagnostics.
+   `validateInstance()` now returns value diagnostics with stable paths before DER generation. Next, connect those diagnostics to the browser UI and add richer code-specific messages for OID, binary, and time values.
 
 8. Expand PKI fixtures.
    Grow fixtures in this order: `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`, `Extension`, and a minimal `TBSCertificate` subset.
