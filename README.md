@@ -1,13 +1,12 @@
 # ASN.1 Instance Builder
 
-ASN.1 Instance Builder is an experimental TypeScript module for creating concrete
-DER-encoded data from ASN.1-oriented schema models. The project is intended to
-fit the PKI Studio family style used by `pvkgadgets` and `certgadgets`: a small
+ASN.1 Instance Builder is an experimental browser tool and reusable TypeScript
+API for creating concrete DER-encoded data from ASN.1-oriented schema models. It
+fits the PKI Studio family style used by `pvkgadgets` and `certgadgets`: a small
 browser app for hands-on work, plus UI-independent core APIs that can be reused
 from other browser or Webview hosts.
 
-The repository is private while the initial shape is still settling. The code,
-README, fixtures, and API names are written with a future public release in mind.
+Current version: 0.1.0
 
 ## Current Direction
 
@@ -15,13 +14,14 @@ The first milestone starts with a hand-written Schema Model and a small ASN.1
 definition parser that targets the same model. The parser is intentionally a
 subset parser while the instance model and DER builder stabilize.
 
-The intended flow is:
+The intended browser flow is:
 
-1. Write a supported ASN.1 definition or provide a Schema Model JSON document.
-2. Select a defined type.
-3. Provide an instance value as JSON-like data.
+1. Load a supported ASN.1 definition from `Load -> NamedObjects`, a local file,
+   or the clipboard.
+2. Select a defined type in the Instance Input pane.
+3. Edit or replace the generated sample instance JSON.
 4. Build DER bytes from the instance value.
-5. Inspect the generated DER with PkiStudioJS.
+5. Inspect the generated DER in a standalone PkiStudioJS viewer tab.
 
 ## MVP Scope
 
@@ -179,6 +179,14 @@ The browser prototype also surfaces schema and instance diagnostics before DER
 generation. Error diagnostics block DER output, while warnings stay visible and
 allow the generated value to be inspected.
 
+The app starts with an empty definition workspace. `Load -> NamedObjects` lists
+the parent definitions currently covered by bundled examples, including
+`Person`, `Certificate`, `CertificationRequest`, `CertificateList`, and
+`PkiBundle`. Loading a named object fills the left definition pane and loads a
+matching sample instance into the right Input pane. When a loaded definition
+contains child types, selecting another type in the Instance Input pane replaces
+the Input pane contents with that type's sample data.
+
 The app shell includes a resizable bottom API log pane, styled like the PKI
 Studio gadget apps, that records schema parsing, diagnostics, DER building,
 PkiStudioJS window opening, and generated DER parsing results for each build
@@ -222,9 +230,15 @@ Check the package contents before publication:
 npm run pack:dry-run
 ```
 
-## Reusing the Core API
+## Reusing from npm
 
-Use the ASN.1 definition parser:
+Install the package in a browser or Webview project:
+
+```sh
+npm install @pkistudio/asn1instancebuilder
+```
+
+Use the UI-independent ASN.1 definition parser and DER builder:
 
 ```ts
 import { bytesToHex, createInstance, parseAsn1Definition } from '@pkistudio/asn1instancebuilder';
@@ -240,7 +254,8 @@ const document = createInstance(schema, 'Person', { name: 'Alice', age: 42 });
 console.log(bytesToHex(document.der));
 ```
 
-The lower-level Schema Model API can also be used directly:
+Use the lower-level Schema Model API directly when a host application already
+owns the schema shape:
 
 ```ts
 import { bytesToHex, createInstance, type Asn1SchemaModule } from '@pkistudio/asn1instancebuilder';
@@ -265,6 +280,19 @@ const document = createInstance(schema, 'Person', { name: 'Alice', age: 42 });
 console.log(bytesToHex(document.der));
 ```
 
+Mount the browser application from an embedded Webview or browser app:
+
+```ts
+import { initAsn1InstanceBuilder } from '@pkistudio/asn1instancebuilder/app';
+import '@pkistudio/asn1instancebuilder/styles.css';
+
+const app = initAsn1InstanceBuilder({ mount: '#app' });
+```
+
+The package keeps VS Code-specific file access, dialogs, persistence, and
+Webview lifecycle outside `@pkistudio/asn1instancebuilder`; hosts can mount the
+app shell or call the core APIs directly.
+
 ## PkiStudioJS Dependency
 
 The browser app imports PkiStudioJS from `@pkistudio/pkistudiojs` for DER
@@ -275,13 +303,12 @@ inspection and embedded viewer behavior:
 - `@pkistudio/pkistudiojs/viewer`
 
 The first core slice keeps the Schema Model to DER builder local so the instance
-model can stabilize quickly. PkiStudioJS is already wired in as the DER parser
-and viewer adapter, and the adapter can grow as shared encoding APIs become the
-right boundary.
+model can stabilize quickly. PkiStudioJS is wired in as the DER parser and
+standalone viewer for generated output.
 
 ## Package API Shape
 
-Planned npm exports follow the sibling PKI Studio packages:
+The npm exports follow the sibling PKI Studio packages:
 
 - `@pkistudio/asn1instancebuilder`
 - `@pkistudio/asn1instancebuilder/core`

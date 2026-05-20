@@ -187,15 +187,34 @@ textarea {
   box-shadow: 0 8px 18px rgb(15 23 42 / 16%);
 }
 
-.asn1ib-menu-item:hover .asn1ib-submenu,
-.asn1ib-menu-item:focus-within .asn1ib-submenu {
+.asn1ib-menu-item:hover > .asn1ib-submenu,
+.asn1ib-menu-item:focus-within > .asn1ib-submenu {
   display: grid;
   gap: 2px;
+}
+
+.asn1ib-menu-item.is-closed > .asn1ib-submenu {
+  display: none;
 }
 
 .asn1ib-submenu button {
   width: 100%;
   text-align: left;
+}
+
+.asn1ib-submenu .asn1ib-menu-item {
+  width: 100%;
+}
+
+.asn1ib-submenu .asn1ib-submenu {
+  top: -4px;
+  left: calc(100% + 4px);
+}
+
+.asn1ib-named-objects-menu {
+  max-height: min(420px, calc(100dvh - 112px));
+  min-width: 214px;
+  overflow: auto;
 }
 
 .asn1ib-workspace {

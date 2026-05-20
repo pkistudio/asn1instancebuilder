@@ -1,4 +1,28 @@
-import { createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
+import { createInstance, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
+import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
+import defaultsAndEnumeratedDefinition from '../../fixtures/defaults-and-enumerated.asn1?raw';
+import minimalCrlDefinition from '../../fixtures/minimal-crl.asn1?raw';
+import minimalCsrDefinition from '../../fixtures/minimal-csr.asn1?raw';
+import minimalTbsCertificateDefinition from '../../fixtures/minimal-tbs-certificate.asn1?raw';
+import moduleTagsDefinition from '../../fixtures/module-tags.asn1?raw';
+import negativeIntegerDefinition from '../../fixtures/negative-integer.asn1?raw';
+import oidNamesDefinition from '../../fixtures/oid-names.asn1?raw';
+import personDefinition from '../../fixtures/person.asn1?raw';
+import pkiComponentsDefinition from '../../fixtures/pki-components.asn1?raw';
+import taggedPersonDefinition from '../../fixtures/tagged-person.asn1?raw';
+import x509VersionDefinition from '../../fixtures/x509-version.asn1?raw';
+import binaryInputsInput from '../../fixtures/binary-inputs.instance.json?raw';
+import defaultsAndEnumeratedInput from '../../fixtures/defaults-and-enumerated.instance.json?raw';
+import minimalCertificateInput from '../../fixtures/minimal-certificate.instance.json?raw';
+import minimalCrlInput from '../../fixtures/minimal-crl.instance.json?raw';
+import minimalCsrInput from '../../fixtures/minimal-csr.instance.json?raw';
+import minimalTbsCertificateInput from '../../fixtures/minimal-tbs-certificate.instance.json?raw';
+import negativeIntegerInput from '../../fixtures/negative-integer.instance.json?raw';
+import oidNamesInput from '../../fixtures/oid-names.instance.json?raw';
+import personInput from '../../fixtures/person.instance.json?raw';
+import pkiComponentsInput from '../../fixtures/pki-components.instance.json?raw';
+import taggedPersonInput from '../../fixtures/tagged-person.instance.json?raw';
+import x509VersionInput from '../../fixtures/x509-version.instance.json?raw';
 
 declare const __ASN1_INSTANCE_BUILDER_VERSION__: string;
 
@@ -15,6 +39,91 @@ export interface Asn1InstanceBuilderApp {
 }
 
 const VIEWER_STORAGE_PREFIX = 'asn1ib-viewer-';
+const emptySchema: Asn1SchemaModule = { name: '', tagDefault: 'explicit', types: [] };
+
+interface NamedObjectDefinition {
+  id: string;
+  label: string;
+  typeName: string;
+  sourceName: string;
+  definition: string;
+  sampleInputs: SampleInputMap;
+}
+
+type JsonObject = Record<string, unknown>;
+type SampleInputMap = Record<string, unknown>;
+
+function parseFixtureJson<T = unknown>(source: string): T {
+  return JSON.parse(source) as T;
+}
+
+const personSample = parseFixtureJson(personInput);
+const taggedPersonSample = parseFixtureJson(taggedPersonInput);
+const binaryRecordSample = parseFixtureJson(binaryInputsInput);
+const defaultRecordSample = parseFixtureJson(defaultsAndEnumeratedInput);
+const signedRecordSample = parseFixtureJson(negativeIntegerInput);
+const x509VersionSample = parseFixtureJson(x509VersionInput);
+const algorithmIdentifierSample = parseFixtureJson(oidNamesInput);
+const certificateSample = parseFixtureJson(minimalCertificateInput);
+const tbsCertificateSample = parseFixtureJson(minimalTbsCertificateInput);
+const certificationRequestSample = parseFixtureJson<JsonObject>(minimalCsrInput);
+const certificateListSample = parseFixtureJson<JsonObject>(minimalCrlInput);
+const pkiBundleSample = parseFixtureJson<JsonObject>(pkiComponentsInput);
+
+const attributeTypeAndValueSample = {
+  type: 'commonName',
+  value: { selected: 'utf8String', value: 'Example' }
+};
+const directoryStringSample = { selected: 'utf8String', value: 'Example' };
+const relativeDistinguishedNameSample = [attributeTypeAndValueSample];
+const rdnSequenceSample = [relativeDistinguishedNameSample];
+const nameSample = pkiBundleSample.issuer;
+const timeSample = { selected: 'utcTime', value: '260520000000Z' };
+const validitySample = pkiBundleSample.validity;
+const subjectPublicKeyInfoSample = pkiBundleSample.subjectPublicKeyInfo;
+const extensionSample = pkiBundleSample.extension;
+const extensionsSample = [extensionSample];
+const attributeValueSample = { utf8: 'changeit' };
+const attributeValuesSample = [attributeValueSample];
+const attributeSample = {
+  type: '1.2.840.113549.1.9.7',
+  values: attributeValuesSample
+};
+const attributesSample = [attributeSample];
+const revokedCertificateSample = {
+  userCertificate: 42,
+  revocationDate: timeSample
+};
+const revokedCertificatesSample = [revokedCertificateSample];
+
+const pkiComponentSamples: SampleInputMap = {
+  AlgorithmIdentifier: algorithmIdentifierSample,
+  AttributeTypeAndValue: attributeTypeAndValueSample,
+  DirectoryString: directoryStringSample,
+  RelativeDistinguishedName: relativeDistinguishedNameSample,
+  RDNSequence: rdnSequenceSample,
+  Name: nameSample,
+  Time: timeSample,
+  Validity: validitySample,
+  SubjectPublicKeyInfo: subjectPublicKeyInfoSample,
+  Extension: extensionSample,
+  Extensions: extensionsSample
+};
+
+const namedObjectDefinitions: NamedObjectDefinition[] = [
+  { id: 'person', label: 'Person', typeName: 'Person', sourceName: 'person.asn1', definition: personDefinition, sampleInputs: { Person: personSample } },
+  { id: 'tagged-person', label: 'TaggedPerson', typeName: 'TaggedPerson', sourceName: 'tagged-person.asn1', definition: taggedPersonDefinition, sampleInputs: { TaggedPerson: taggedPersonSample } },
+  { id: 'binary-record', label: 'BinaryRecord', typeName: 'BinaryRecord', sourceName: 'binary-inputs.asn1', definition: binaryInputsDefinition, sampleInputs: { BinaryRecord: binaryRecordSample } },
+  { id: 'default-record', label: 'DefaultRecord', typeName: 'DefaultRecord', sourceName: 'defaults-and-enumerated.asn1', definition: defaultsAndEnumeratedDefinition, sampleInputs: { Status: 'warning', DefaultRecord: defaultRecordSample } },
+  { id: 'signed-record', label: 'SignedRecord', typeName: 'SignedRecord', sourceName: 'negative-integer.asn1', definition: negativeIntegerDefinition, sampleInputs: { Delta: 'minusOne', SignedRecord: signedRecordSample } },
+  { id: 'versioned-serial', label: 'VersionedSerial', typeName: 'VersionedSerial', sourceName: 'module-tags.asn1', definition: moduleTagsDefinition, sampleInputs: { Version: 'v3', VersionedSerial: x509VersionSample } },
+  { id: 'tbs-certificate-prefix', label: 'TBSCertificatePrefix', typeName: 'TBSCertificatePrefix', sourceName: 'x509-version.asn1', definition: x509VersionDefinition, sampleInputs: { Version: 'v3', TBSCertificatePrefix: x509VersionSample } },
+  { id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample } },
+  { id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } },
+  { id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } },
+  { id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } },
+  { id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...pkiComponentSamples, PkiBundle: pkiBundleSample } }
+];
 
 export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions): Asn1InstanceBuilderApp {
   const mount = typeof options.mount === 'string' ? document.querySelector<HTMLElement>(options.mount) : options.mount;
@@ -39,6 +148,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const loadDefinitionClipboardButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-clipboard"]');
   const saveDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="save-definition-file"]');
   const closeDefinitionButton = mustFind<HTMLButtonElement>(mount, '[data-role="close-definition"]');
+  const namedObjectButtons = Array.from(mount.querySelectorAll<HTMLButtonElement>('[data-role="load-named-object"]'));
   const definitionStatus = mustFind<HTMLElement>(mount, '[data-role="definition-status"]');
   const buildStatus = mustFind<HTMLElement>(mount, '[data-role="build-status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
@@ -46,8 +156,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const aboutDialog = mustFind<HTMLDialogElement>(mount, '[data-role="about-dialog"]');
   const closeAboutButton = mustFind<HTMLButtonElement>(mount, '[data-role="close-about"]');
 
-  let schema = options.schema ?? exampleSchema;
-  let input: unknown = options.input ?? exampleInput;
+  let schema = emptySchema;
+  let input: unknown;
+  let activeSampleInputs: SampleInputMap | undefined;
   const apiLogEntries: ApiLogEntry[] = [];
 
   initializeWorkspaceResizer(mount, workspace, workspaceResizer);
@@ -62,8 +173,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   };
 
   const clearDefinitionWorkspace = () => {
-    schema = { name: '', tagDefault: 'explicit', types: [] };
+    schema = emptySchema;
     input = undefined;
+    activeSampleInputs = undefined;
     definitionText.value = '';
     inputText.value = '';
     typeSelect.innerHTML = '';
@@ -73,18 +185,19 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     updateDefinitionActionState();
   };
 
-  const loadDefinitionText = (text: string, source: string) => {
+  const loadDefinitionText = (text: string, source: string, preferredTypeName?: string): boolean => {
     if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
     definitionText.value = text;
     try {
       schema = parseDefinitionInput(text);
-      refreshTypeSelect();
+      refreshTypeSelect(preferredTypeName);
       const schemaDiagnostics = validateSchemaModule(schema);
       renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
       definitionStatus.textContent = schemaDiagnostics.length > 0 ? `Loaded from ${source}. Definition diagnostics: ${formatDiagnosticSummary(schemaDiagnostics)}` : `Loaded ${schema.types.length} ASN.1 type${schema.types.length === 1 ? '' : 's'} from ${source}.`;
       buildStatus.textContent = 'Definition loaded. Build DER to update the generated output.';
       updateDefinitionActionState();
       appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'loadDefinition', detail: `${source}: ${formatDiagnosticSummary(schemaDiagnostics)}` });
+      return true;
     } catch (error) {
       typeSelect.innerHTML = '';
       renderDiagnostics(diagnosticsList, [{ title: 'Definition', diagnostics: [diagnosticFromError(error)] }]);
@@ -92,6 +205,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       buildStatus.textContent = 'Build status is waiting for a valid definition.';
       updateDefinitionActionState();
       appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'loadDefinition-error', detail: definitionStatus.textContent });
+      return false;
     }
   };
 
@@ -106,6 +220,17 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     if (preferredTypeName && schema.types.some((type) => type.name === preferredTypeName)) {
       typeSelect.value = preferredTypeName;
     }
+  };
+
+  const loadSampleInputForType = (typeName: string): boolean => {
+    if (!activeSampleInputs || !Object.prototype.hasOwnProperty.call(activeSampleInputs, typeName)) return false;
+    const sampleInput = activeSampleInputs[typeName];
+    input = sampleInput;
+    inputText.value = JSON.stringify(sampleInput, null, 2);
+    buildStatus.textContent = `Loaded ${typeName} sample input. Build DER to update the generated output.`;
+    updateDefinitionActionState();
+    appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'loadSampleInput', detail: `${typeName}: loaded sample input.` });
+    return true;
   };
 
   const app: Asn1InstanceBuilderApp = {
@@ -163,6 +288,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     },
     loadSchema(nextSchema) {
       schema = nextSchema;
+      activeSampleInputs = undefined;
       definitionText.value = JSON.stringify(schema, null, 2);
       refreshTypeSelect();
       updateDefinitionActionState();
@@ -180,6 +306,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   });
   closeDefinitionButton.addEventListener('click', clearDefinitionWorkspace);
   inputText.addEventListener('input', updateDefinitionActionState);
+  typeSelect.addEventListener('change', () => {
+    loadSampleInputForType(typeSelect.value);
+  });
   loadDefinitionFileButton.addEventListener('click', () => definitionFileInput.click());
   loadDefinitionClipboardButton.addEventListener('click', async () => {
     try {
@@ -195,6 +324,18 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     saveTextFile(definitionText.value, 'asn1-definition.asn1');
     appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinition', detail: 'Saved the definition text to asn1-definition.asn1.' });
   });
+  for (const button of namedObjectButtons) {
+    button.addEventListener('click', () => {
+      const namedObject = namedObjectDefinitions.find((definition) => definition.id === button.dataset.objectId);
+      if (!namedObject) return;
+      const loaded = loadDefinitionText(namedObject.definition, `NamedObjects: ${namedObject.label} (${namedObject.sourceName})`, namedObject.typeName);
+      if (loaded) {
+        activeSampleInputs = namedObject.sampleInputs;
+        loadSampleInputForType(namedObject.typeName);
+      }
+      closeMenuAfterSelection(button, definitionText);
+    });
+  }
   definitionFileInput.addEventListener('change', async () => {
     const file = definitionFileInput.files?.[0];
     definitionFileInput.value = '';
@@ -216,11 +357,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     }
   });
   closeAboutButton.addEventListener('click', () => aboutDialog.close());
-  definitionText.value = exampleDefinition;
-  refreshTypeSelect();
+  if (options.schema) app.loadSchema(options.schema);
+  if (options.input !== undefined) app.loadInput(options.input);
   updateDefinitionActionState();
-  app.loadInput(input);
-  void app.build(false);
   return app;
 }
 
@@ -238,6 +377,12 @@ function renderShell(): string {
             <div class="asn1ib-submenu" role="menu">
               <button type="button" role="menuitem" data-role="load-definition-file">from File</button>
               <button type="button" role="menuitem" data-role="load-definition-clipboard">from Clipboard</button>
+              <div class="asn1ib-menu-item asn1ib-nested-menu-item" role="none">
+                <button type="button" role="menuitem" aria-haspopup="menu">NamedObjects</button>
+                <div class="asn1ib-submenu asn1ib-named-objects-menu" role="menu">
+                  ${renderNamedObjectMenuItems()}
+                </div>
+              </div>
             </div>
           </div>
           <div class="asn1ib-menu-item">
@@ -298,6 +443,23 @@ function renderShell(): string {
       </section>
     </dialog>
   `;
+}
+
+function renderNamedObjectMenuItems(): string {
+  return namedObjectDefinitions.map((definition) => `<button type="button" role="menuitem" data-role="load-named-object" data-object-id="${definition.id}">${definition.label}</button>`).join('');
+}
+
+function closeMenuAfterSelection(button: HTMLButtonElement, focusTarget: HTMLElement): void {
+  const menuItems = Array.from(button.closest('.asn1ib-pane-menu')?.querySelectorAll('.asn1ib-menu-item') ?? []).filter((element) => element instanceof HTMLElement) as HTMLElement[];
+  button.blur();
+  focusTarget.focus({ preventScroll: true });
+  if (menuItems.length === 0) return;
+  for (const menuItem of menuItems) menuItem.classList.add('is-closed');
+  const reopen = () => {
+    for (const menuItem of menuItems) menuItem.classList.remove('is-closed');
+  };
+  for (const menuItem of menuItems) menuItem.addEventListener('pointerleave', reopen, { once: true });
+  window.setTimeout(reopen, 1000);
 }
 
 function parseDefinitionInput(value: string): Asn1SchemaModule {
