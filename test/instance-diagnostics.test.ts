@@ -77,4 +77,23 @@ describe('instance diagnostics', () => {
       { severity: 'error', code: 'invalid-object-identifier', message: 'Unknown OID name or invalid dotted decimal OBJECT IDENTIFIER: unknownOidName.', path: ['contact', 'identifier'] }
     ]);
   });
+
+  it('returns semantic diagnostics for byte arrays and calendar dates', () => {
+    const schema = parseAsn1Definition(definition);
+    const diagnostics = validateInstance(schema, 'Person', {
+      name: 'Alice',
+      age: 42,
+      payload: [0, 256],
+      flags: { bytes: [], unusedBits: 1 },
+      issuedAt: '260230000000Z',
+      expiresAt: '20250229000000Z'
+    });
+
+    expect(diagnostics).toEqual([
+      { severity: 'error', code: 'invalid-byte-value', message: 'Byte arrays must contain integers from 0 to 255.', path: ['payload', '1'] },
+      { severity: 'error', code: 'invalid-bit-string', message: 'BIT STRING unused bits must be 0 when the byte content is empty.', path: ['flags', 'unusedBits'] },
+      { severity: 'error', code: 'invalid-time', message: 'utcTime contains a calendar date that does not exist.', path: ['issuedAt'] },
+      { severity: 'error', code: 'invalid-time', message: 'generalizedTime contains a calendar date that does not exist.', path: ['expiresAt'] }
+    ]);
+  });
 });

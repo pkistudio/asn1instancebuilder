@@ -149,7 +149,12 @@ function validateBitStringInput(input: unknown, path: string[]): InstanceDiagnos
     if (unusedBits !== undefined && (typeof unusedBits !== 'number' || !Number.isInteger(unusedBits) || unusedBits < 0 || unusedBits > 7)) {
       return { severity: 'error', code: 'invalid-bit-string', message: 'BIT STRING unused bits must be an integer between 0 and 7.', path: [...path, 'unusedBits'] };
     }
-    return validateByteInput(input.bytes, 'BIT STRING', [...path, 'bytes']);
+    const byteDiagnostic = validateByteInput(input.bytes, 'BIT STRING', [...path, 'bytes']);
+    if (byteDiagnostic) return byteDiagnostic;
+    if (unusedBits && normalizeBytes(input.bytes as ByteInput).length === 0) {
+      return { severity: 'error', code: 'invalid-bit-string', message: 'BIT STRING unused bits must be 0 when the byte content is empty.', path: [...path, 'unusedBits'] };
+    }
+    return null;
   }
 
   return validateByteInput(input, 'BIT STRING', path);
@@ -158,6 +163,13 @@ function validateBitStringInput(input: unknown, path: string[]): InstanceDiagnos
 function validateByteInput(input: unknown, typeName: string, path: string[]): InstanceDiagnostic | null {
   if (!isByteInputShape(input)) {
     return { severity: 'error', code: 'invalid-byte-input', message: `${typeName} expects HEX text, a number array, Uint8Array, or a { hex }, { utf8 }, or { base64 } object.`, path };
+  }
+
+  if (Array.isArray(input)) {
+    const invalidIndex = input.findIndex((value) => typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 255);
+    if (invalidIndex >= 0) {
+      return { severity: 'error', code: 'invalid-byte-value', message: 'Byte arrays must contain integers from 0 to 255.', path: [...path, String(invalidIndex)] };
+    }
   }
 
   try {
@@ -190,8 +202,25 @@ function validateTimeInput(input: unknown, kind: 'utcTime' | 'generalizedTime', 
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) {
     return { severity: 'error', code: 'invalid-time', message: `${kind} contains an out-of-range date or time component.`, path };
   }
+  const year = kind === 'utcTime' ? utcYearToFullYear(Number.parseInt(match[1], 10)) : Number.parseInt(match[1], 10);
+  if (day > daysInMonth(year, month)) {
+    return { severity: 'error', code: 'invalid-time', message: `${kind} contains a calendar date that does not exist.`, path };
+  }
 
   return null;
+}
+
+function utcYearToFullYear(year: number): number {
+  return year >= 50 ? 1900 + year : 2000 + year;
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function diagnosticFromError(code: string, error: unknown, path: string[]): InstanceDiagnostic {

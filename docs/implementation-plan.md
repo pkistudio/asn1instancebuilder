@@ -17,7 +17,7 @@ with browser and Webview hosts.
    Negative INTEGER values now use DER two's-complement encoding. Next, add bounds diagnostics and larger fixture coverage for serial-like and signed integer values.
 
 4. Improve binary input ergonomics.
-   `BIT STRING` and `OCTET STRING` now accept explicit `{ hex }`, `{ utf8 }`, and `{ base64 }` byte inputs with stricter HEX validation. Next, add browser UI controls and byte-length diagnostics for those input modes.
+   `BIT STRING` and `OCTET STRING` now accept explicit `{ hex }`, `{ utf8 }`, and `{ base64 }` byte inputs with stricter HEX validation. Instance diagnostics now reject number array entries outside `0..255` and invalid empty `BIT STRING` unused-bit combinations. Next, add browser UI controls and byte-length diagnostics for those input modes.
 
 5. Expand OID name helpers.
    `OBJECT IDENTIFIER` inputs now accept a small built-in PKI name table and schema-provided `oidNames`. Next, bridge this to the PkiStudioJS OID resolver so hosts can share the same OID dictionary across builder and viewer surfaces.
@@ -26,7 +26,7 @@ with browser and Webview hosts.
    `validateSchemaModule()` now returns structured diagnostics for duplicate type names, unknown type references, duplicate field names, duplicate context-specific tags, unsupported tag numbers, and duplicate named numbers. The browser UI now displays schema diagnostics before DER generation. Next, add parser recovery paths.
 
 7. Expand instance diagnostics.
-   `validateInstance()` now returns value diagnostics with stable paths before DER generation. The browser UI now displays instance diagnostics and blocks DER generation on errors. OID, binary, and time values now report code-specific diagnostics. Next, add additional semantic checks such as byte-length and date validity rules by type profile.
+   `validateInstance()` now returns value diagnostics with stable paths before DER generation. The browser UI now displays instance diagnostics and blocks DER generation on errors. OID, binary, and time values now report code-specific diagnostics, including byte array value ranges and calendar date validity. Next, add additional semantic checks such as byte-length rules by type profile.
 
 8. Expand PKI fixtures.
    Fixtures now cover `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`, `Extension`, a composed PKI bundle, a minimal `TBSCertificate` subset with version, serial number, issuer, subject, validity, SPKI, and extensions, a full `Certificate` wrapper, variants for omitted default version and optional extensions, a minimal `CertificateList` CRL wrapper, and a minimal `CertificationRequest` CSR wrapper. Next, add more realistic signature and public-key byte fixtures.
@@ -39,6 +39,6 @@ with browser and Webview hosts.
 
 ## Current Focus
 
-The current implementation focus is adding additional semantic diagnostics such
-as byte-length and date validity rules by type profile, then adding more
-realistic certificate, CRL, and CSR signature/public-key byte fixtures.
+The current implementation focus is adding byte-length rules by type profile,
+then adding more realistic certificate, CRL, and CSR signature/public-key byte
+fixtures.
