@@ -51,6 +51,7 @@ The current core prototype supports these schema kinds:
 - `DEFAULT` fields for `BOOLEAN`, `INTEGER`, and `ENUMERATED` values
 - binary inputs as compact HEX, byte arrays, `{ hex }`, `{ utf8 }`, or `{ base64 }`
 - `OBJECT IDENTIFIER` inputs by dotted decimal value, built-in PKI names, or schema-provided `oidNames`
+- schema diagnostics through `validateSchemaModule()`
 
 The ASN.1 definition parser currently accepts simple modules shaped like:
 
@@ -154,6 +155,15 @@ Hosts can also attach an `oidNames` map to the Schema Model:
 	"oidNames": { "exampleAlgorithm": "1.2.3.4.5" },
 	"types": []
 }
+```
+
+Schema diagnostics can be collected before building DER:
+
+```ts
+import { parseAsn1Definition, validateSchemaModule } from '@pkistudio/asn1instancebuilder';
+
+const schema = parseAsn1Definition(source);
+const diagnostics = validateSchemaModule(schema);
 ```
 
 ## Development

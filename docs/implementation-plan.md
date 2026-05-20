@@ -22,8 +22,8 @@ with browser and Webview hosts.
 5. Expand OID name helpers.
    `OBJECT IDENTIFIER` inputs now accept a small built-in PKI name table and schema-provided `oidNames`. Next, bridge this to the PkiStudioJS OID resolver so hosts can share the same OID dictionary across builder and viewer surfaces.
 
-6. Add schema diagnostics.
-   Return structured diagnostics for duplicate type names, unknown type references, duplicate field names, unsupported syntax, and unsupported tagging modes.
+6. Expand schema diagnostics.
+   `validateSchemaModule()` now returns structured diagnostics for duplicate type names, unknown type references, duplicate field names, duplicate context-specific tags, unsupported tag numbers, and duplicate named numbers. Next, connect diagnostics to the browser UI and parser recovery paths.
 
 7. Add instance diagnostics.
    Provide validation results with stable paths such as `tbsCertificate.serialNumber` instead of only throwing errors during DER generation.
