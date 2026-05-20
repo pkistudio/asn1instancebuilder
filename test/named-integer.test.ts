@@ -17,6 +17,7 @@ describe('named INTEGER values', () => {
   it('encodes named INTEGER values from Schema Model JSON', () => {
     const schema: Asn1SchemaModule = {
       name: 'X509VersionExample',
+      tagDefault: 'explicit',
       types: [
         { name: 'Version', type: { kind: 'integer', values: [{ name: 'v1', value: 0 }, { name: 'v2', value: 1 }, { name: 'v3', value: 2 }] } },
         {

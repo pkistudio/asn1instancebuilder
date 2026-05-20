@@ -52,8 +52,11 @@ export interface Asn1TypeDefinition {
 
 export interface Asn1SchemaModule {
   name: string;
+  tagDefault: Asn1TagDefault;
   types: Asn1TypeDefinition[];
 }
+
+export type Asn1TagDefault = 'explicit' | 'implicit' | 'automatic';
 
 export interface ChoiceInput {
   selected: string;

@@ -19,6 +19,7 @@ describe('defaults and ENUMERATED', () => {
   it('encodes ENUMERATED values from Schema Model JSON', () => {
     const schema: Asn1SchemaModule = {
       name: 'DefaultExample',
+      tagDefault: 'explicit',
       types: [
         { name: 'Status', type: { kind: 'enumerated', values: [{ name: 'ok', value: 0 }, { name: 'warning', value: 1 }, { name: 'failed', value: 2 }] } },
         {

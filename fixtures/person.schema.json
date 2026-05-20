@@ -1,5 +1,6 @@
 {
   "name": "Example",
+  "tagDefault": "explicit",
   "types": [
     {
       "name": "Person",

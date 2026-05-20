@@ -13,6 +13,7 @@ describe('tagged encoding', () => {
   it('encodes context-specific EXPLICIT and IMPLICIT tags from Schema Model JSON', () => {
     const schema: Asn1SchemaModule = {
       name: 'ExampleTagged',
+      tagDefault: 'explicit',
       types: [
         {
           name: 'TaggedPerson',

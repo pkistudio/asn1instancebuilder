@@ -2,6 +2,7 @@ import type { Asn1SchemaModule } from './schema-model';
 
 export const exampleSchema: Asn1SchemaModule = {
   name: 'Example',
+  tagDefault: 'explicit',
   types: [
     {
       name: 'Person',

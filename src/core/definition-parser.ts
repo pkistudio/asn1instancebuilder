@@ -1,5 +1,5 @@
 import { Asn1InstanceBuilderError } from './errors';
-import type { Asn1Field, Asn1PrimitiveKind, Asn1SchemaModule, Asn1Type } from './schema-model';
+import type { Asn1Field, Asn1PrimitiveKind, Asn1SchemaModule, Asn1TagDefault, Asn1Type } from './schema-model';
 
 interface Token {
   value: string;
@@ -22,12 +22,14 @@ export function parseAsn1Definition(source: string): Asn1SchemaModule {
 
 class DefinitionParser {
   private index = 0;
+  private tagDefault: Asn1TagDefault = 'explicit';
 
   constructor(private readonly tokens: Token[]) {}
 
   parseModule(): Asn1SchemaModule {
     const moduleName = this.expectIdentifier('module name');
     this.expectKeyword('DEFINITIONS');
+    this.tagDefault = this.parseTagDefault();
     this.expectSymbol('::=');
     this.expectKeyword('BEGIN');
 
@@ -38,15 +40,30 @@ class DefinitionParser {
       types.push({ name, type: this.parseType() });
     }
     this.expectEnd();
-    return { name: moduleName, types };
+    return { name: moduleName, tagDefault: this.tagDefault, types };
+  }
+
+  private parseTagDefault(): Asn1TagDefault {
+    if (this.matchKeyword('EXPLICIT')) {
+      this.expectKeyword('TAGS');
+      return 'explicit';
+    }
+    if (this.matchKeyword('IMPLICIT')) {
+      this.expectKeyword('TAGS');
+      return 'implicit';
+    }
+    if (this.matchKeyword('AUTOMATIC')) {
+      this.expectKeyword('TAGS');
+      return 'automatic';
+    }
+    return 'explicit';
   }
 
   private parseType(): Asn1Type {
     if (this.matchSymbol('[')) {
       const tagNumber = this.expectTagNumber('context-specific tag number');
       this.expectSymbol(']');
-      const mode = this.matchKeyword('EXPLICIT') ? 'explicit' : this.matchKeyword('IMPLICIT') ? 'implicit' : undefined;
-      if (!mode) throw this.error('Expected EXPLICIT or IMPLICIT after context-specific tag.', this.peek());
+      const mode = this.parseTagMode();
       return { kind: 'tagged', tag: { class: 'context', number: tagNumber, mode }, type: this.parseType() };
     }
 
@@ -110,6 +127,15 @@ class DefinitionParser {
       this.expectSymbol('}');
       return fields;
     }
+  }
+
+  private parseTagMode(): 'explicit' | 'implicit' {
+    if (this.matchKeyword('EXPLICIT')) return 'explicit';
+    if (this.matchKeyword('IMPLICIT')) return 'implicit';
+    if (this.tagDefault === 'automatic') {
+      throw this.error('AUTOMATIC TAGS does not yet infer a mode for manually tagged types without EXPLICIT or IMPLICIT.', this.peek());
+    }
+    return this.tagDefault;
   }
 
   private parseNamedNumberList(): { name: string; value: number }[] {
