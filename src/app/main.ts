@@ -1,4 +1,4 @@
-import { bytesToHex, createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
+import { createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
 import oidResolverScriptUrl from '@pkistudio/pkistudiojs/oid-resolver?url';
 import pkistudioCoreScriptUrl from '@pkistudio/pkistudiojs/core?url';
 import pkistudioViewerScriptUrl from '@pkistudio/pkistudiojs/viewer?url';
@@ -27,13 +27,15 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const definitionText = mustFind<HTMLTextAreaElement>(mount, '[data-role="definition"]');
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
-  const outputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="output"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
+  const aboutButton = mustFind<HTMLButtonElement>(mount, '[data-role="about"]');
+  const aboutDialog = mustFind<HTMLDialogElement>(mount, '[data-role="about-dialog"]');
+  const closeAboutButton = mustFind<HTMLButtonElement>(mount, '[data-role="close-about"]');
 
   let schema = options.schema ?? exampleSchema;
   let input: unknown = options.input ?? exampleInput;
@@ -67,7 +69,6 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
         if (hasDiagnosticErrors(schemaDiagnostics)) {
           handledDiagnosticError = true;
-          outputText.value = '';
           throw new Error('Schema diagnostics contain errors. Fix them before building DER.');
         }
 
@@ -82,13 +83,11 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         ]);
         if (hasDiagnosticErrors(instanceDiagnostics)) {
           handledDiagnosticError = true;
-          outputText.value = '';
           throw new Error('Instance diagnostics contain errors. Fix the input before building DER.');
         }
 
         const document = createInstance(schema, typeName, input);
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'createInstance', detail: `${document.typeName}: ${document.der.byteLength} DER bytes.` });
-        outputText.value = bytesToHex(document.der);
         const warningCount = [...schemaDiagnostics, ...instanceDiagnostics].filter((diagnostic) => diagnostic.severity === 'warning').length;
         status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
         if (openViewerWindow) {
@@ -99,7 +98,6 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseGeneratedDer', detail: 'PkiStudioJS core parsed the generated DER.' });
       } catch (error) {
         appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'build-error', detail: error instanceof Error ? error.message : String(error) });
-        outputText.value = '';
         status.textContent = error instanceof Error ? error.message : String(error);
         if (!handledDiagnosticError) {
           renderDiagnostics(diagnosticsList, [{ title: 'Build', diagnostics: [diagnosticFromError(error)] }]);
@@ -122,6 +120,14 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     renderApiLog(apiLog, apiLogEntries);
   });
   buildButton.addEventListener('click', () => void app.build());
+  aboutButton.addEventListener('click', () => {
+    if (typeof aboutDialog.showModal === 'function') {
+      aboutDialog.showModal();
+    } else {
+      aboutDialog.setAttribute('open', '');
+    }
+  });
+  closeAboutButton.addEventListener('click', () => aboutDialog.close());
   definitionText.value = exampleDefinition;
   refreshTypeSelect();
   app.loadInput(input);
@@ -131,29 +137,32 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
 function renderShell(): string {
   return `
-    <header class="asn1ib-header">
-      <div>
-        <h1>ASN.1 Instance Builder</h1>
-        <p>ASN.1 definition to DER prototype, version ${__ASN1_INSTANCE_BUILDER_VERSION__}</p>
-      </div>
-      <button type="button" data-role="build">Build DER</button>
-    </header>
+    <nav class="asn1ib-toolbar" aria-label="Application toolbar">
+      <strong>ASN.1 Instance Builder</strong>
+      <button type="button" data-role="about">About</button>
+    </nav>
     <main class="asn1ib-workspace">
       <section class="asn1ib-panel asn1ib-definition-panel">
         <nav class="asn1ib-pane-menu" aria-label="Definition actions">
-          <strong>ASN.1 Definition or Schema Model</strong>
+          <button type="button" disabled>New</button>
+          <button type="button" disabled>Open</button>
+          <button type="button" disabled>Save</button>
         </nav>
         <div class="asn1ib-left-card">
+          <div class="asn1ib-card-title">ASN.1 Definition or Schema Model</div>
           <textarea data-role="definition" spellcheck="false"></textarea>
           <p class="asn1ib-status" data-role="status"></p>
         </div>
       </section>
       <section class="asn1ib-panel">
-        <div class="asn1ib-panel-title">Instance Input</div>
-        <select data-role="type" aria-label="ASN.1 type"></select>
+        <div class="asn1ib-panel-title">
+          <span>Instance Input</span>
+          <button type="button" data-role="build">Build DER</button>
+        </div>
+        <div class="asn1ib-instance-controls">
+          <select data-role="type" aria-label="ASN.1 type"></select>
+        </div>
         <textarea data-role="input" spellcheck="false"></textarea>
-        <div class="asn1ib-output-label">DER HEX</div>
-        <textarea data-role="output" spellcheck="false" readonly></textarea>
         <div class="asn1ib-output-label">Diagnostics</div>
         <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
       </section>
@@ -165,6 +174,18 @@ function renderShell(): string {
       </div>
       <ol data-role="api-log" class="asn1ib-api-log"></ol>
     </section>
+    <dialog class="asn1ib-about-dialog" data-role="about-dialog">
+      <section class="asn1ib-about-panel">
+        <div>
+          <div class="asn1ib-about-name">ASN.1 Instance Builder</div>
+          <div class="asn1ib-about-version">Version ${__ASN1_INSTANCE_BUILDER_VERSION__}</div>
+        </div>
+        <p>Build DER instances from supported ASN.1 definitions and inspect successful output in PkiStudioJS.</p>
+        <form method="dialog">
+          <button type="button" data-role="close-about">Close</button>
+        </form>
+      </section>
+    </dialog>
   `;
 }
 

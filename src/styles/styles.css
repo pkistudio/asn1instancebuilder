@@ -19,6 +19,7 @@
   --splitter: #9aa3af;
   --button-bg-start: #ffffff;
   --button-bg-end: #e7e9ee;
+  --shadow-dialog: 0 18px 50px rgb(15 23 42 / 28%);
   --api-log-row-border: #edf0f4;
   --api-log-operation: #1f4f86;
   background: linear-gradient(var(--bg-start), var(--bg));
@@ -47,6 +48,7 @@
     --splitter: #7b8492;
     --button-bg-start: #343943;
     --button-bg-end: #252a32;
+    --shadow-dialog: 0 18px 50px rgb(0 0 0 / 45%);
     --api-log-row-border: #303640;
     --api-log-operation: #9fc7ff;
   }
@@ -96,46 +98,54 @@ textarea {
   cursor: row-resize;
 }
 
-.asn1ib-header {
+.asn1ib-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
   border: 1px solid var(--panel-border);
   border-bottom: 0;
   padding: 4px;
   background: linear-gradient(var(--chrome-start), var(--chrome));
 }
 
-.asn1ib-header h1 {
+.asn1ib-toolbar strong {
   margin: 0;
   padding: 4px 8px;
   font-size: 13px;
   font-weight: 700;
 }
 
-.asn1ib-header p {
-  margin: 0 0 0 8px;
-  display: inline;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.asn1ib-header button {
+.asn1ib-toolbar button,
+.asn1ib-pane-menu button,
+.asn1ib-panel-title button,
+.asn1ib-about-panel button {
   min-height: 0;
   border: 1px solid transparent;
   border-radius: 3px;
-  padding: 4px 12px;
+  padding: 4px 10px;
   color: var(--text);
   background: transparent;
   cursor: pointer;
 }
 
-.asn1ib-header button:hover,
-.asn1ib-header button:focus-visible {
+.asn1ib-toolbar button:hover,
+.asn1ib-toolbar button:focus-visible,
+.asn1ib-pane-menu button:hover:not(:disabled),
+.asn1ib-pane-menu button:focus-visible:not(:disabled),
+.asn1ib-panel-title button:hover,
+.asn1ib-panel-title button:focus-visible,
+.asn1ib-about-panel button:hover,
+.asn1ib-about-panel button:focus-visible {
   border-color: var(--hover-border);
   background: var(--hover-bg);
   outline: none;
+}
+
+.asn1ib-pane-menu button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.72;
 }
 
 .asn1ib-workspace {
@@ -151,7 +161,7 @@ textarea {
 
 .asn1ib-panel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto minmax(160px, 1fr) auto minmax(96px, 0.38fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--panel-border);
@@ -163,22 +173,19 @@ textarea {
 .asn1ib-definition-panel {
   display: flex;
   flex-direction: column;
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--panel-border);
+  background: var(--window);
 }
 
 .asn1ib-pane-menu {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  gap: 2px;
   border: 1px solid var(--panel-border);
   border-bottom: 0;
   padding: 4px;
   background: linear-gradient(var(--chrome-start), var(--chrome));
-}
-
-.asn1ib-pane-menu strong {
-  padding: 4px 8px;
 }
 
 .asn1ib-left-card {
@@ -188,10 +195,20 @@ textarea {
   gap: 6px;
   min-height: 0;
   border-top: 1px solid var(--panel-border);
-  border-bottom: 1px solid var(--panel-border);
   padding: 6px;
   background: var(--window);
   overflow: hidden;
+}
+
+.asn1ib-card-title {
+  flex: 0 0 auto;
+  border: 1px solid var(--subtle-border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .asn1ib-left-card textarea {
@@ -201,12 +218,21 @@ textarea {
 
 .asn1ib-panel-title,
 .asn1ib-output-label {
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px;
   font-size: 12px;
   font-weight: 650;
-  color: var(--muted);
+  color: var(--text);
   border-bottom: 1px solid var(--subtle-border);
   background: linear-gradient(var(--chrome-start), var(--chrome));
+}
+
+.asn1ib-panel-title span,
+.asn1ib-output-label {
+  padding: 4px 6px;
 }
 
 .asn1ib-panel textarea {
@@ -225,17 +251,18 @@ textarea {
   line-height: 1.45;
 }
 
+.asn1ib-instance-controls {
+  padding: 8px;
+  background: var(--panel);
+}
+
 .asn1ib-panel select {
-  margin: 10px;
+  width: 100%;
   min-height: 32px;
   border: 1px solid var(--control-border);
   border-radius: 3px;
   color: var(--text);
   background: var(--panel);
-}
-
-.asn1ib-panel:nth-child(2) {
-  grid-template-rows: auto auto minmax(160px, 1fr) auto 96px auto minmax(96px, 0.4fr);
 }
 
 .asn1ib-diagnostics {
@@ -245,7 +272,7 @@ textarea {
   padding: 8px 10px;
   font-size: 12px;
   line-height: 1.4;
-  background: Canvas;
+  background: var(--panel);
 }
 
 .asn1ib-diagnostics-empty {
@@ -293,9 +320,53 @@ textarea {
   border-radius: 3px;
   padding: 6px 7px;
   color: var(--muted);
-  background: var(--panel);
+  background: linear-gradient(var(--chrome-start), var(--chrome));
   font-size: 12px;
   line-height: 1.35;
+}
+
+.asn1ib-about-dialog {
+  width: min(360px, calc(100% - 32px));
+  margin: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 0;
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: var(--shadow-dialog);
+}
+
+.asn1ib-about-dialog::backdrop {
+  background: rgb(15 23 42 / 28%);
+}
+
+.asn1ib-about-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.asn1ib-about-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.asn1ib-about-name {
+  font-weight: 700;
+}
+
+.asn1ib-about-version {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.asn1ib-about-panel form {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
 }
 
 .asn1ib-api-log-resizer {
