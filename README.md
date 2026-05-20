@@ -28,7 +28,7 @@ The intended flow is:
 The current core prototype supports these schema kinds:
 
 - `BOOLEAN`
-- non-negative `INTEGER`, including named integer values such as `v1(0)`
+- `INTEGER`, including negative values and named integer values such as `v1(0)`
 - `BIT STRING`
 - `OCTET STRING`
 - `NULL`

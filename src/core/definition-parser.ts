@@ -191,7 +191,7 @@ class DefinitionParser {
 
   private expectNumber(label: string): number {
     const token = this.take();
-    if (!token || !/^\d+$/.test(token.value)) {
+    if (!token || !/^-?\d+$/.test(token.value)) {
       throw this.error(`Expected ${label}.`, token);
     }
     const value = Number.parseInt(token.value, 10);
@@ -285,7 +285,7 @@ function tokenize(source: string): Token[] {
       index += 1;
       continue;
     }
-    const number = /^\d+/.exec(source.slice(index));
+    const number = /^-?\d+/.exec(source.slice(index));
     if (number) {
       tokens.push({ value: number[0], offset: index });
       index += number[0].length;

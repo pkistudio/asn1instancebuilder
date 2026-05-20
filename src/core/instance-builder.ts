@@ -93,7 +93,7 @@ function resolveIntegerInput(type: Extract<Asn1Type, { kind: 'integer' }>, input
   if (typeof input === 'string') {
     const named = type.values?.find((candidate) => candidate.name === input);
     if (named) return named.value;
-    if (/^\d+$/.test(input)) return input;
+    if (/^-?\d+$/.test(input)) return input;
   }
   throw new Asn1InstanceBuilderError('INTEGER expects a named value, number, bigint, or decimal string.');
 }

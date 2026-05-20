@@ -31,8 +31,8 @@ export function encodeEnumerated(input: bigint | number | string): Uint8Array {
 
 function encodeIntegerContent(input: bigint | number | string): Uint8Array {
   const value = typeof input === 'bigint' ? input : BigInt(input);
-  if (value < 0n) throw new Error('Negative INTEGER values are not supported yet.');
   if (value === 0n) return Uint8Array.of(0);
+  if (value < 0n) return encodeNegativeIntegerContent(value);
 
   const content: number[] = [];
   let remaining = value;
@@ -41,6 +41,19 @@ function encodeIntegerContent(input: bigint | number | string): Uint8Array {
     remaining >>= 8n;
   }
   if ((content[0] & 0x80) !== 0) content.unshift(0);
+  return Uint8Array.from(content);
+}
+
+function encodeNegativeIntegerContent(value: bigint): Uint8Array {
+  const content: number[] = [];
+  let byteLength = 1;
+  while (value < -(1n << BigInt(byteLength * 8 - 1))) {
+    byteLength += 1;
+  }
+  const unsignedValue = (1n << BigInt(byteLength * 8)) + value;
+  for (let index = byteLength - 1; index >= 0; index -= 1) {
+    content.push(Number((unsignedValue >> BigInt(index * 8)) & 0xffn));
+  }
   return Uint8Array.from(content);
 }
 

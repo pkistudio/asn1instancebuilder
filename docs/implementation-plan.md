@@ -13,8 +13,8 @@ with browser and Webview hosts.
 2. Expand automatic tagging.
    `AUTOMATIC TAGS` now assigns low-form context-specific implicit tags to untagged `SEQUENCE`, `SET`, and `CHOICE` components. Next, refine edge cases such as open types, CHOICE alternatives that require explicit handling, and extension markers.
 
-3. Support negative INTEGER values.
-   Implement DER two's-complement INTEGER content encoding so the core builder is not limited to non-negative values.
+3. Refine INTEGER support.
+   Negative INTEGER values now use DER two's-complement encoding. Next, add bounds diagnostics and larger fixture coverage for serial-like and signed integer values.
 
 4. Improve binary input ergonomics.
    Add validation and UI affordances for `BIT STRING` and `OCTET STRING`, including clearer HEX handling and byte-length diagnostics.
