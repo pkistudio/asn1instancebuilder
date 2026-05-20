@@ -148,7 +148,17 @@ textarea {
 }
 
 .asn1ib-viewer-panel {
+  grid-template-rows: auto auto 1fr;
   border-right: 0;
+}
+
+.asn1ib-viewer-notice {
+  min-height: 20px;
+  padding: 5px 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+  color: color-mix(in srgb, CanvasText 68%, transparent);
+  background: color-mix(in srgb, Canvas 97%, CanvasText 3%);
+  font-size: 12px;
 }
 
 .asn1ib-viewer {

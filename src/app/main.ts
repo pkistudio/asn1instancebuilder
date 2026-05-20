@@ -28,19 +28,23 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
+  const viewerNotice = mustFind<HTMLElement>(mount, '[data-role="viewer-notice"]');
   const viewerMount = mustFind<HTMLElement>(mount, '[data-role="viewer"]');
 
   let schema = options.schema ?? exampleSchema;
   let input: unknown = options.input ?? exampleInput;
   let viewer: { loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null = null;
 
-  const refreshTypeSelect = () => {
+  const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
     typeSelect.innerHTML = '';
     for (const type of schema.types) {
       const option = document.createElement('option');
       option.value = type.name;
       option.textContent = type.name;
       typeSelect.append(option);
+    }
+    if (preferredTypeName && schema.types.some((type) => type.name === preferredTypeName)) {
+      typeSelect.value = preferredTypeName;
     }
   };
 
@@ -78,10 +82,12 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
         viewer ??= await initViewer(viewerMount);
         viewer?.loadBytes(document.der, `Loaded ${document.typeName} from ASN.1 Instance Builder.`);
+        viewerNotice.textContent = `Viewer loaded ${document.typeName}.`;
         await parseGeneratedDer(document.der);
       } catch (error) {
         outputText.value = '';
         status.textContent = error instanceof Error ? error.message : String(error);
+        viewerNotice.textContent = viewer ? 'Viewer shows the last successfully built DER.' : 'Viewer will load after a successful build.';
         if (!handledDiagnosticError) {
           renderDiagnostics(diagnosticsList, [{ title: 'Build', diagnostics: [diagnosticFromError(error)] }]);
         }
@@ -131,6 +137,7 @@ function renderShell(): string {
       </section>
       <section class="asn1ib-panel asn1ib-viewer-panel">
         <div class="asn1ib-panel-title">PkiStudioJS Viewer</div>
+        <div data-role="viewer-notice" class="asn1ib-viewer-notice"></div>
         <div data-role="viewer" class="asn1ib-viewer"></div>
       </section>
     </main>
