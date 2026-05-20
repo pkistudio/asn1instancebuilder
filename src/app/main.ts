@@ -27,6 +27,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const outputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="output"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
+  const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
+  const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
   const viewerNotice = mustFind<HTMLElement>(mount, '[data-role="viewer-notice"]');
@@ -36,6 +38,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   let input: unknown = options.input ?? exampleInput;
   let viewer: { loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null = null;
   const apiLogEntries: ApiLogEntry[] = [];
+
+  initializeApiLogResizer(mount, apiLogResizer);
 
   const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
     typeSelect.innerHTML = '';
@@ -114,6 +118,10 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     }
   };
 
+  clearApiLogButton.addEventListener('click', () => {
+    apiLogEntries.splice(0);
+    renderApiLog(apiLog, apiLogEntries);
+  });
   buildButton.addEventListener('click', () => void app.build());
   definitionText.value = exampleDefinition;
   refreshTypeSelect();
@@ -132,9 +140,14 @@ function renderShell(): string {
       <button type="button" data-role="build">Build DER</button>
     </header>
     <main class="asn1ib-workspace">
-      <section class="asn1ib-panel">
-        <div class="asn1ib-panel-title">ASN.1 Definition or Schema Model</div>
-        <textarea data-role="definition" spellcheck="false"></textarea>
+      <section class="asn1ib-panel asn1ib-definition-panel">
+        <nav class="asn1ib-pane-menu" aria-label="Definition actions">
+          <strong>ASN.1 Definition or Schema Model</strong>
+        </nav>
+        <div class="asn1ib-left-card">
+          <textarea data-role="definition" spellcheck="false"></textarea>
+          <p class="asn1ib-status" data-role="status"></p>
+        </div>
       </section>
       <section class="asn1ib-panel">
         <div class="asn1ib-panel-title">Instance Input</div>
@@ -151,11 +164,13 @@ function renderShell(): string {
         <div data-role="viewer" class="asn1ib-viewer"></div>
       </section>
     </main>
+    <div data-role="api-log-resizer" class="asn1ib-api-log-resizer" role="separator" aria-label="Resize API log" aria-orientation="horizontal" tabindex="0"></div>
     <section class="asn1ib-log-panel" aria-label="API call log">
-      <div class="asn1ib-log-title">API Log</div>
+      <div class="asn1ib-api-log-header">
+        <button type="button" data-role="clear-api-log">Clear API Log</button>
+      </div>
       <ol data-role="api-log" class="asn1ib-api-log"></ol>
     </section>
-    <footer class="asn1ib-status" data-role="status"></footer>
   `;
 }
 
@@ -244,20 +259,64 @@ function renderApiLog(container: HTMLElement, entries: ApiLogEntry[]): void {
   container.innerHTML = '';
   for (const entry of entries) {
     const item = document.createElement('li');
-    item.className = `asn1ib-api-log-entry asn1ib-api-log-${entry.level}`;
+    item.className = `asn1ib-api-log-entry ${entry.level}`;
 
-    const meta = document.createElement('span');
-    meta.className = 'asn1ib-api-log-meta';
-    meta.textContent = `${entry.time} ${entry.label}`;
+    const time = document.createElement('time');
+    time.textContent = entry.time;
+
+    const operation = document.createElement('span');
+    operation.className = 'asn1ib-api-log-operation';
+    operation.textContent = entry.label;
 
     const detail = document.createElement('span');
     detail.className = 'asn1ib-api-log-detail';
     detail.textContent = entry.detail;
 
-    item.append(meta, detail);
+    item.append(time, operation, detail);
     container.append(item);
   }
   container.scrollTop = container.scrollHeight;
+}
+
+function initializeApiLogResizer(root: HTMLElement, resizer: HTMLElement): void {
+  const minHeight = 86;
+  const maxHeight = 360;
+  let startY = 0;
+  let startHeight = 0;
+
+  const stopResize = () => {
+    root.classList.remove('resizing-rows');
+    document.removeEventListener('pointermove', resize);
+    document.removeEventListener('pointerup', stopResize);
+  };
+
+  const resize = (event: PointerEvent) => {
+    const nextHeight = clamp(startHeight - (event.clientY - startY), minHeight, Math.min(maxHeight, Math.floor(window.innerHeight * 0.45)));
+    root.style.setProperty('--api-log-height', `${nextHeight}px`);
+  };
+
+  resizer.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    startY = event.clientY;
+    const currentHeight = getComputedStyle(root).getPropertyValue('--api-log-height').trim();
+    startHeight = Number.parseFloat(currentHeight) || 156;
+    root.classList.add('resizing-rows');
+    document.addEventListener('pointermove', resize);
+    document.addEventListener('pointerup', stopResize, { once: true });
+  });
+
+  resizer.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const currentHeight = Number.parseFloat(getComputedStyle(root).getPropertyValue('--api-log-height')) || 156;
+    const delta = event.key === 'ArrowUp' ? 16 : -16;
+    const nextHeight = clamp(currentHeight + delta, minHeight, Math.min(maxHeight, Math.floor(window.innerHeight * 0.45)));
+    root.style.setProperty('--api-log-height', `${nextHeight}px`);
+  });
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function diagnosticFromError(error: unknown): AppDiagnostic {
