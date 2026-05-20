@@ -19,8 +19,8 @@ with browser and Webview hosts.
 4. Improve binary input ergonomics.
    `BIT STRING` and `OCTET STRING` now accept explicit `{ hex }`, `{ utf8 }`, and `{ base64 }` byte inputs with stricter HEX validation. Next, add browser UI controls and byte-length diagnostics for those input modes.
 
-5. Add OID name helpers.
-   Let `OBJECT IDENTIFIER` inputs use well-known names through the PkiStudioJS OID resolver while keeping dotted decimal input as the canonical form.
+5. Expand OID name helpers.
+   `OBJECT IDENTIFIER` inputs now accept a small built-in PKI name table and schema-provided `oidNames`. Next, bridge this to the PkiStudioJS OID resolver so hosts can share the same OID dictionary across builder and viewer surfaces.
 
 6. Add schema diagnostics.
    Return structured diagnostics for duplicate type names, unknown type references, duplicate field names, unsupported syntax, and unsupported tagging modes.

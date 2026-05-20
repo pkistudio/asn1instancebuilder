@@ -50,6 +50,7 @@ The current core prototype supports these schema kinds:
 - automatic low-form context-specific tags for untagged `SEQUENCE`, `SET`, and `CHOICE` components
 - `DEFAULT` fields for `BOOLEAN`, `INTEGER`, and `ENUMERATED` values
 - binary inputs as compact HEX, byte arrays, `{ hex }`, `{ utf8 }`, or `{ base64 }`
+- `OBJECT IDENTIFIER` inputs by dotted decimal value, built-in PKI names, or schema-provided `oidNames`
 
 The ASN.1 definition parser currently accepts simple modules shaped like:
 
@@ -133,6 +134,25 @@ Binary values can be provided in several forms:
 	"payload": { "hex": "de ad be ef" },
 	"label": { "utf8": "hello" },
 	"flags": { "bytes": { "base64": "oA==" }, "unusedBits": 5 }
+}
+```
+
+OID values can use dotted decimal text or known names:
+
+```json
+{
+	"algorithm": "sha256WithRSAEncryption"
+}
+```
+
+Hosts can also attach an `oidNames` map to the Schema Model:
+
+```json
+{
+	"name": "Example",
+	"tagDefault": "explicit",
+	"oidNames": { "exampleAlgorithm": "1.2.3.4.5" },
+	"types": []
 }
 ```
 

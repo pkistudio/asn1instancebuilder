@@ -1,6 +1,7 @@
 import { normalizeBytes } from './bytes';
 import { encodeBitString, encodeBoolean, encodeEnumerated, encodeExplicitContextSpecificTag, encodeImplicitContextSpecificTag, encodeInteger, encodeNull, encodeObjectIdentifier, encodeOctetString, encodeSequence, encodeSet, encodeText } from './der';
 import { Asn1InstanceBuilderError, withPath } from './errors';
+import { resolveObjectIdentifierName } from './oid-names';
 import type { Asn1Field, Asn1SchemaModule, Asn1Type, BitStringInput, ByteInput, ChoiceInput, InstanceDocument } from './schema-model';
 
 export function createInstance(schemaModule: Asn1SchemaModule, typeName: string, input: unknown): InstanceDocument {
@@ -32,7 +33,7 @@ export function encodeValue(schemaModule: Asn1SchemaModule, type: Asn1Type, inpu
       return encodeNull();
     case 'objectIdentifier':
       if (typeof input !== 'string') throw new Asn1InstanceBuilderError('OBJECT IDENTIFIER expects a dotted decimal string.');
-      return encodeObjectIdentifier(input);
+      return encodeObjectIdentifier(resolveObjectIdentifierName(input, schemaModule.oidNames));
     case 'utf8String':
     case 'printableString':
     case 'ia5String':

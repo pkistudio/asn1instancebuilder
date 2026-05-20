@@ -1,5 +1,6 @@
 export { bytesToHex, hexToBytes } from './bytes';
 export { createInstance, encodeValue, resolveDefinedType } from './instance-builder';
+export { builtInOidNames, resolveObjectIdentifierName } from './oid-names';
 export { parseAsn1Definition } from './definition-parser';
 export { parseGeneratedDer } from './pkistudio-adapter';
 export { exampleDefinition, exampleInput, exampleSchema } from './example-schema';

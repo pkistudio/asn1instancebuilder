@@ -53,6 +53,7 @@ export interface Asn1TypeDefinition {
 export interface Asn1SchemaModule {
   name: string;
   tagDefault: Asn1TagDefault;
+  oidNames?: Record<string, string>;
   types: Asn1TypeDefinition[];
 }
 
