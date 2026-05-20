@@ -52,6 +52,11 @@ TBSCertificate ::= SEQUENCE {
   subjectPublicKeyInfo SubjectPublicKeyInfo,
   extensions [3] EXPLICIT Extensions OPTIONAL
 }
+Certificate ::= SEQUENCE {
+  tbsCertificate TBSCertificate,
+  signatureAlgorithm AlgorithmIdentifier,
+  signatureValue BIT STRING
+}
 END`;
 
 const baseInput = {
@@ -94,5 +99,24 @@ describe('minimal TBSCertificate fixture', () => {
     expect(validateInstance(schema, 'TBSCertificate', baseInput)).toEqual([]);
     expect(hex.startsWith('3075')).toBe(true);
     expect(hex.includes('a003020100')).toBe(false);
+  });
+
+  it('builds a full Certificate wrapper around TBSCertificate', () => {
+    const input = {
+      tbsCertificate: {
+        version: 'v3',
+        ...baseInput,
+        extensions: [{ extnID: 'basicConstraints', critical: true, extnValue: { hex: '30030101ff' } }]
+      },
+      signatureAlgorithm: { algorithm: 'sha256WithRSAEncryption', parameters: null },
+      signatureValue: { bytes: { hex: 'deadbeef' }, unusedBits: 0 }
+    };
+    const document = createInstance(schema, 'Certificate', input);
+    const hex = bytesToHex(document.der);
+
+    expect(validateInstance(schema, 'Certificate', input)).toEqual([]);
+    expect(hex.startsWith('3081a8')).toBe(true);
+    expect(hex.includes('30818fa00302010202012a')).toBe(true);
+    expect(hex.endsWith('030500deadbeef')).toBe(true);
   });
 });

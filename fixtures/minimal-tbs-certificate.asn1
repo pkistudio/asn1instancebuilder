@@ -62,4 +62,10 @@ TBSCertificate ::= SEQUENCE {
   extensions [3] EXPLICIT Extensions OPTIONAL
 }
 
+Certificate ::= SEQUENCE {
+  tbsCertificate TBSCertificate,
+  signatureAlgorithm AlgorithmIdentifier,
+  signatureValue BIT STRING
+}
+
 END
