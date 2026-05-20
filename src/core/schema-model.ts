@@ -64,9 +64,11 @@ export interface ChoiceInput {
 }
 
 export interface BitStringInput {
-  bytes: Uint8Array | number[] | string;
+  bytes: ByteInput;
   unusedBits?: number;
 }
+
+export type ByteInput = Uint8Array | number[] | string | { hex: string } | { utf8: string } | { base64: string };
 
 export interface InstanceDocument {
   moduleName: string;

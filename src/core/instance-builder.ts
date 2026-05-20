@@ -1,7 +1,7 @@
 import { normalizeBytes } from './bytes';
 import { encodeBitString, encodeBoolean, encodeEnumerated, encodeExplicitContextSpecificTag, encodeImplicitContextSpecificTag, encodeInteger, encodeNull, encodeObjectIdentifier, encodeOctetString, encodeSequence, encodeSet, encodeText } from './der';
 import { Asn1InstanceBuilderError, withPath } from './errors';
-import type { Asn1Field, Asn1SchemaModule, Asn1Type, BitStringInput, ChoiceInput, InstanceDocument } from './schema-model';
+import type { Asn1Field, Asn1SchemaModule, Asn1Type, BitStringInput, ByteInput, ChoiceInput, InstanceDocument } from './schema-model';
 
 export function createInstance(schemaModule: Asn1SchemaModule, typeName: string, input: unknown): InstanceDocument {
   const type = resolveDefinedType(schemaModule, typeName);
@@ -159,10 +159,19 @@ function encodeBitStringInput(input: unknown): Uint8Array {
 }
 
 function normalizeBytesInput(input: unknown, typeName: string): Uint8Array {
-  if (input instanceof Uint8Array || Array.isArray(input) || typeof input === 'string') {
+  if (isByteInput(input)) {
     return normalizeBytes(input);
   }
-  throw new Asn1InstanceBuilderError(`${typeName} expects HEX text, a number array, or Uint8Array.`);
+  throw new Asn1InstanceBuilderError(`${typeName} expects HEX text, a number array, Uint8Array, or a { hex }, { utf8 }, or { base64 } object.`);
+}
+
+function isByteInput(input: unknown): input is ByteInput {
+  return input instanceof Uint8Array ||
+    Array.isArray(input) ||
+    typeof input === 'string' ||
+    (isRecord(input) && typeof input.hex === 'string') ||
+    (isRecord(input) && typeof input.utf8 === 'string') ||
+    (isRecord(input) && typeof input.base64 === 'string');
 }
 
 function isRecord(input: unknown): input is Record<string, unknown> {

@@ -49,6 +49,7 @@ The current core prototype supports these schema kinds:
 - module tag defaults from `EXPLICIT TAGS`, `IMPLICIT TAGS`, and `AUTOMATIC TAGS` headers
 - automatic low-form context-specific tags for untagged `SEQUENCE`, `SET`, and `CHOICE` components
 - `DEFAULT` fields for `BOOLEAN`, `INTEGER`, and `ENUMERATED` values
+- binary inputs as compact HEX, byte arrays, `{ hex }`, `{ utf8 }`, or `{ base64 }`
 
 The ASN.1 definition parser currently accepts simple modules shaped like:
 
@@ -122,6 +123,16 @@ Version ::= INTEGER {
 TBSCertificatePrefix ::= SEQUENCE {
 	version [0] EXPLICIT Version DEFAULT v1,
 	serialNumber INTEGER
+}
+```
+
+Binary values can be provided in several forms:
+
+```json
+{
+	"payload": { "hex": "de ad be ef" },
+	"label": { "utf8": "hello" },
+	"flags": { "bytes": { "base64": "oA==" }, "unusedBits": 5 }
 }
 ```
 
