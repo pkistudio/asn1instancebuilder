@@ -29,7 +29,7 @@ with browser and Webview hosts.
    `validateInstance()` now returns value diagnostics with stable paths before DER generation. Next, connect those diagnostics to the browser UI and add richer code-specific messages for OID, binary, and time values.
 
 8. Expand PKI fixtures.
-   Grow fixtures in this order: `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`, `Extension`, and a minimal `TBSCertificate` subset.
+   Fixtures now cover `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`, `Extension`, and a composed PKI bundle. Next, grow this into a minimal `TBSCertificate` subset with version, serial number, issuer, subject, validity, SPKI, and extensions.
 
 9. Add browser load and save workflows.
    Support loading ASN.1 definitions and instance JSON from files, then saving generated DER, HEX, and instance JSON.
@@ -39,5 +39,5 @@ with browser and Webview hosts.
 
 ## Current Focus
 
-The current implementation focus is expanding realistic PKI fixtures on top of
-module header and automatic tagging support.
+The current implementation focus is growing the PKI fixture set into a minimal
+`TBSCertificate` subset and connecting diagnostics into the browser UI.

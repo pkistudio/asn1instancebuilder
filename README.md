@@ -175,6 +175,10 @@ import { validateInstance } from '@pkistudio/asn1instancebuilder';
 const diagnostics = validateInstance(schema, 'Person', input);
 ```
 
+The checked-in fixtures include PKI-oriented component examples for
+`AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`,
+and `Extension` under `fixtures/pki-components.asn1`.
+
 ## Development
 
 Install dependencies:

@@ -1,0 +1,55 @@
+PkiComponentExample DEFINITIONS EXPLICIT TAGS ::= BEGIN
+
+AlgorithmIdentifier ::= SEQUENCE {
+  algorithm OBJECT IDENTIFIER,
+  parameters NULL OPTIONAL
+}
+
+AttributeTypeAndValue ::= SEQUENCE {
+  type OBJECT IDENTIFIER,
+  value DirectoryString
+}
+
+DirectoryString ::= CHOICE {
+  utf8String UTF8String,
+  printableString PrintableString
+}
+
+RelativeDistinguishedName ::= SET OF AttributeTypeAndValue
+
+RDNSequence ::= SEQUENCE OF RelativeDistinguishedName
+
+Name ::= CHOICE {
+  rdnSequence RDNSequence
+}
+
+Time ::= CHOICE {
+  utcTime UTCTime,
+  generalTime GeneralizedTime
+}
+
+Validity ::= SEQUENCE {
+  notBefore Time,
+  notAfter Time
+}
+
+SubjectPublicKeyInfo ::= SEQUENCE {
+  algorithm AlgorithmIdentifier,
+  subjectPublicKey BIT STRING
+}
+
+Extension ::= SEQUENCE {
+  extnID OBJECT IDENTIFIER,
+  critical BOOLEAN DEFAULT FALSE,
+  extnValue OCTET STRING
+}
+
+PkiBundle ::= SEQUENCE {
+  signature AlgorithmIdentifier,
+  issuer Name,
+  validity Validity,
+  subjectPublicKeyInfo SubjectPublicKeyInfo,
+  extension Extension OPTIONAL
+}
+
+END
