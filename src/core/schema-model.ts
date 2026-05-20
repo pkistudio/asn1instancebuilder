@@ -1,0 +1,67 @@
+export type Asn1PrimitiveKind =
+  | 'boolean'
+  | 'integer'
+  | 'bitString'
+  | 'octetString'
+  | 'null'
+  | 'objectIdentifier'
+  | 'utf8String'
+  | 'printableString'
+  | 'ia5String'
+  | 'utcTime'
+  | 'generalizedTime';
+
+export type Asn1Type =
+  | { kind: Asn1PrimitiveKind }
+  | { kind: 'enumerated'; values: Asn1NamedNumber[] }
+  | { kind: 'tagged'; tag: Asn1Tag; type: Asn1Type }
+  | { kind: 'sequence'; fields: Asn1Field[] }
+  | { kind: 'set'; fields: Asn1Field[] }
+  | { kind: 'choice'; alternatives: Asn1Field[] }
+  | { kind: 'sequenceOf'; elementType: Asn1Type }
+  | { kind: 'setOf'; elementType: Asn1Type }
+  | { kind: 'defined'; typeName: string };
+
+export interface Asn1Tag {
+  class: 'context';
+  number: number;
+  mode: 'explicit' | 'implicit';
+}
+
+export interface Asn1NamedNumber {
+  name: string;
+  value: number;
+}
+
+export interface Asn1Field {
+  name: string;
+  type: Asn1Type;
+  optional?: boolean;
+  defaultValue?: unknown;
+}
+
+export interface Asn1TypeDefinition {
+  name: string;
+  type: Asn1Type;
+}
+
+export interface Asn1SchemaModule {
+  name: string;
+  types: Asn1TypeDefinition[];
+}
+
+export interface ChoiceInput {
+  selected: string;
+  value: unknown;
+}
+
+export interface BitStringInput {
+  bytes: Uint8Array | number[] | string;
+  unusedBits?: number;
+}
+
+export interface InstanceDocument {
+  moduleName: string;
+  typeName: string;
+  der: Uint8Array;
+}
