@@ -179,7 +179,9 @@ The checked-in fixtures include PKI-oriented component examples for
 `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`,
 and `Extension` under `fixtures/pki-components.asn1`, plus a minimal
 `TBSCertificate` and `Certificate` example under
-`fixtures/minimal-tbs-certificate.asn1`.
+`fixtures/minimal-tbs-certificate.asn1`. Certificate instance variants cover an
+explicit v3 certificate, a default v1 certificate without extensions, and a v3
+certificate without optional extensions.
 
 ## Development
 

@@ -119,4 +119,42 @@ describe('minimal TBSCertificate fixture', () => {
     expect(hex.includes('30818fa00302010202012a')).toBe(true);
     expect(hex.endsWith('030500deadbeef')).toBe(true);
   });
+
+  it('builds a v1 Certificate variant with default version and extensions omitted', () => {
+    const input = {
+      tbsCertificate: {
+        ...baseInput,
+        serialNumber: 43
+      },
+      signatureAlgorithm: { algorithm: 'sha256WithRSAEncryption', parameters: null },
+      signatureValue: { bytes: { hex: 'cafebabe' }, unusedBits: 0 }
+    };
+    const document = createInstance(schema, 'Certificate', input);
+    const hex = bytesToHex(document.der);
+
+    expect(validateInstance(schema, 'Certificate', input)).toEqual([]);
+    expect(hex.startsWith('30818d3075')).toBe(true);
+    expect(hex.includes('a003020100')).toBe(false);
+    expect(hex.includes('a3133011300f0603551d130101ff040530030101ff')).toBe(false);
+    expect(hex.endsWith('030500cafebabe')).toBe(true);
+  });
+
+  it('builds a v3 Certificate variant with optional extensions omitted', () => {
+    const input = {
+      tbsCertificate: {
+        version: 'v3',
+        ...baseInput,
+        serialNumber: 44
+      },
+      signatureAlgorithm: { algorithm: 'sha256WithRSAEncryption', parameters: null },
+      signatureValue: { bytes: { hex: 'feedface' }, unusedBits: 0 }
+    };
+    const document = createInstance(schema, 'Certificate', input);
+    const hex = bytesToHex(document.der);
+
+    expect(validateInstance(schema, 'Certificate', input)).toEqual([]);
+    expect(hex.startsWith('308192307aa00302010202012c')).toBe(true);
+    expect(hex.includes('a3133011300f0603551d130101ff040530030101ff')).toBe(false);
+    expect(hex.endsWith('030500feedface')).toBe(true);
+  });
 });
