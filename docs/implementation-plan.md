@@ -32,13 +32,13 @@ with browser and Webview hosts.
    Fixtures now cover `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`, `Extension`, a composed PKI bundle, a minimal `TBSCertificate` subset with version, serial number, issuer, subject, validity, SPKI, and extensions, a full `Certificate` wrapper, variants for omitted default version and optional extensions, a minimal `CertificateList` CRL wrapper, and a minimal `CertificationRequest` CSR wrapper. Next, add more realistic signature and public-key byte fixtures.
 
 9. Add browser load and save workflows.
-   Support loading ASN.1 definitions and instance JSON from files, then saving generated DER, HEX, and instance JSON.
+   The browser app now includes a bottom API log pane for schema parsing, diagnostics, DER building, PkiStudioJS Viewer loading, and generated DER parsing results. Next, support loading ASN.1 definitions and instance JSON from files, then saving generated DER, HEX, and instance JSON.
 
 10. Prepare public release hygiene.
     Add CI, release workflow notes, supported/unsupported syntax tables, package metadata review, and a privacy/security note.
 
 ## Current Focus
 
-The current implementation focus is adding byte-length rules by type profile,
-then adding more realistic certificate, CRL, and CSR signature/public-key byte
-fixtures.
+The current implementation focus is adding file load/save workflows, then adding
+byte-length rules by type profile and more realistic certificate, CRL, and CSR
+signature/public-key byte fixtures.

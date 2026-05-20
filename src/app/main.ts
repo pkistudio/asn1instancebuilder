@@ -26,6 +26,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
   const outputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="output"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
+  const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
   const viewerNotice = mustFind<HTMLElement>(mount, '[data-role="viewer-notice"]');
@@ -34,6 +35,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   let schema = options.schema ?? exampleSchema;
   let input: unknown = options.input ?? exampleInput;
   let viewer: { loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null = null;
+  const apiLogEntries: ApiLogEntry[] = [];
 
   const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
     typeSelect.innerHTML = '';
@@ -51,10 +53,13 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const app: Asn1InstanceBuilderApp = {
     async build() {
       let handledDiagnosticError = false;
+      appendApiLog(apiLog, apiLogEntries, { level: 'info', label: 'build', detail: 'Build DER requested.' });
       try {
         schema = parseDefinitionInput(definitionText.value);
+        appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseAsn1Definition', detail: `Loaded ${schema.types.length} type${schema.types.length === 1 ? '' : 's'} from the definition input.` });
         refreshTypeSelect();
         const schemaDiagnostics = validateSchemaModule(schema);
+        appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'validateSchemaModule', detail: formatDiagnosticSummary(schemaDiagnostics) });
         renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
         if (hasDiagnosticErrors(schemaDiagnostics)) {
           handledDiagnosticError = true;
@@ -66,6 +71,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         const typeName = typeSelect.value || schema.types[0]?.name;
         if (!typeName) throw new Error('The schema does not define any ASN.1 types.');
         const instanceDiagnostics = validateInstance(schema, typeName, input);
+        appendApiLog(apiLog, apiLogEntries, { level: instanceDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : instanceDiagnostics.length > 0 ? 'warning' : 'success', label: 'validateInstance', detail: `${typeName}: ${formatDiagnosticSummary(instanceDiagnostics)}` });
         renderDiagnostics(diagnosticsList, [
           { title: 'Schema', diagnostics: schemaDiagnostics },
           { title: 'Instance', diagnostics: instanceDiagnostics }
@@ -77,14 +83,18 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         }
 
         const document = createInstance(schema, typeName, input);
+        appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'createInstance', detail: `${document.typeName}: ${document.der.byteLength} DER bytes.` });
         outputText.value = bytesToHex(document.der);
         const warningCount = [...schemaDiagnostics, ...instanceDiagnostics].filter((diagnostic) => diagnostic.severity === 'warning').length;
         status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
         viewer ??= await initViewer(viewerMount);
         viewer?.loadBytes(document.der, `Loaded ${document.typeName} from ASN.1 Instance Builder.`);
+        appendApiLog(apiLog, apiLogEntries, { level: viewer ? 'success' : 'warning', label: 'viewer.loadBytes', detail: viewer ? `Loaded ${document.der.byteLength} bytes into PkiStudioJS Viewer.` : 'PkiStudioJS Viewer is not available.' });
         viewerNotice.textContent = `Viewer loaded ${document.typeName}.`;
         await parseGeneratedDer(document.der);
+        appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'parseGeneratedDer', detail: 'PkiStudioJS core parsed the generated DER.' });
       } catch (error) {
+        appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'build-error', detail: error instanceof Error ? error.message : String(error) });
         outputText.value = '';
         status.textContent = error instanceof Error ? error.message : String(error);
         viewerNotice.textContent = viewer ? 'Viewer shows the last successfully built DER.' : 'Viewer will load after a successful build.';
@@ -141,6 +151,10 @@ function renderShell(): string {
         <div data-role="viewer" class="asn1ib-viewer"></div>
       </section>
     </main>
+    <section class="asn1ib-log-panel" aria-label="API call log">
+      <div class="asn1ib-log-title">API Log</div>
+      <ol data-role="api-log" class="asn1ib-api-log"></ol>
+    </section>
     <footer class="asn1ib-status" data-role="status"></footer>
   `;
 }
@@ -152,6 +166,21 @@ function parseDefinitionInput(value: string): Asn1SchemaModule {
 }
 
 type AppDiagnostic = SchemaDiagnostic | InstanceDiagnostic;
+
+type ApiLogLevel = 'info' | 'success' | 'warning' | 'error';
+
+interface ApiLogEntry {
+  time: string;
+  level: ApiLogLevel;
+  label: string;
+  detail: string;
+}
+
+interface NewApiLogEntry {
+  level: ApiLogLevel;
+  label: string;
+  detail: string;
+}
 
 interface DiagnosticSection {
   title: string;
@@ -196,6 +225,39 @@ function formatDiagnostic(diagnostic: AppDiagnostic): string {
 
 function hasDiagnosticErrors(diagnostics: AppDiagnostic[]): boolean {
   return diagnostics.some((diagnostic) => diagnostic.severity === 'error');
+}
+
+function formatDiagnosticSummary(diagnostics: AppDiagnostic[]): string {
+  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length;
+  const warnings = diagnostics.filter((diagnostic) => diagnostic.severity === 'warning').length;
+  if (errors === 0 && warnings === 0) return 'no diagnostics.';
+  return `${errors} error${errors === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'}.`;
+}
+
+function appendApiLog(container: HTMLElement, entries: ApiLogEntry[], entry: NewApiLogEntry): void {
+  entries.push({ ...entry, time: new Date().toLocaleTimeString() });
+  if (entries.length > 80) entries.splice(0, entries.length - 80);
+  renderApiLog(container, entries);
+}
+
+function renderApiLog(container: HTMLElement, entries: ApiLogEntry[]): void {
+  container.innerHTML = '';
+  for (const entry of entries) {
+    const item = document.createElement('li');
+    item.className = `asn1ib-api-log-entry asn1ib-api-log-${entry.level}`;
+
+    const meta = document.createElement('span');
+    meta.className = 'asn1ib-api-log-meta';
+    meta.textContent = `${entry.time} ${entry.label}`;
+
+    const detail = document.createElement('span');
+    detail.className = 'asn1ib-api-log-detail';
+    detail.textContent = entry.detail;
+
+    item.append(meta, detail);
+    container.append(item);
+  }
+  container.scrollTop = container.scrollHeight;
 }
 
 function diagnosticFromError(error: unknown): AppDiagnostic {

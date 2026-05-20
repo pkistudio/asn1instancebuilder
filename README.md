@@ -179,6 +179,10 @@ The browser prototype also surfaces schema and instance diagnostics before DER
 generation. Error diagnostics block DER output, while warnings stay visible and
 allow the generated value to be inspected.
 
+The app shell includes a bottom API log pane that records schema parsing,
+diagnostics, DER building, PkiStudioJS Viewer loading, and generated DER parsing
+results for each build attempt.
+
 The checked-in fixtures include PKI-oriented component examples for
 `AlgorithmIdentifier`, `Name`/`RDNSequence`, `Validity`, `SubjectPublicKeyInfo`,
 and `Extension` under `fixtures/pki-components.asn1`, plus a minimal
