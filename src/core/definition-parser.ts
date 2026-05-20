@@ -125,17 +125,32 @@ class DefinitionParser {
       fields.push({ name, type, ...(optional ? { optional } : {}), ...(hasDefault ? { defaultValue } : {}) });
       if (this.matchSymbol(',')) continue;
       this.expectSymbol('}');
-      return fields;
+      return this.applyAutomaticTags(fields);
     }
   }
 
   private parseTagMode(): 'explicit' | 'implicit' {
     if (this.matchKeyword('EXPLICIT')) return 'explicit';
     if (this.matchKeyword('IMPLICIT')) return 'implicit';
-    if (this.tagDefault === 'automatic') {
-      throw this.error('AUTOMATIC TAGS does not yet infer a mode for manually tagged types without EXPLICIT or IMPLICIT.', this.peek());
-    }
-    return this.tagDefault;
+    return this.tagDefault === 'automatic' ? 'implicit' : this.tagDefault;
+  }
+
+  private applyAutomaticTags(fields: Asn1Field[]): Asn1Field[] {
+    if (this.tagDefault !== 'automatic') return fields;
+    const usedTags = new Set(fields.flatMap((field) => (field.type.kind === 'tagged' ? [field.type.tag.number] : [])));
+    let nextTagNumber = 0;
+    return fields.map((field) => {
+      if (field.type.kind === 'tagged') return field;
+      while (usedTags.has(nextTagNumber)) nextTagNumber += 1;
+      if (nextTagNumber > 30) throw this.error('AUTOMATIC TAGS only supports low-form tag numbers from 0 to 30.', undefined);
+      const taggedField: Asn1Field = {
+        ...field,
+        type: { kind: 'tagged', tag: { class: 'context', number: nextTagNumber, mode: 'implicit' }, type: field.type }
+      };
+      usedTags.add(nextTagNumber);
+      nextTagNumber += 1;
+      return taggedField;
+    });
   }
 
   private parseNamedNumberList(): { name: string; value: number }[] {

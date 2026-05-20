@@ -10,8 +10,8 @@ with browser and Webview hosts.
 1. Extend ASN.1 module headers.
    Support `DEFINITIONS EXPLICIT TAGS ::= BEGIN`, `DEFINITIONS IMPLICIT TAGS ::= BEGIN`, and `DEFINITIONS AUTOMATIC TAGS ::= BEGIN`. Store the tagging default in the Schema Model and use it when a manually tagged type omits `EXPLICIT` or `IMPLICIT`.
 
-2. Add automatic tagging.
-   After module headers are stored, implement `AUTOMATIC TAGS` for `SEQUENCE`, `SET`, and `CHOICE` components that do not already have an explicit tag.
+2. Expand automatic tagging.
+   `AUTOMATIC TAGS` now assigns low-form context-specific implicit tags to untagged `SEQUENCE`, `SET`, and `CHOICE` components. Next, refine edge cases such as open types, CHOICE alternatives that require explicit handling, and extension markers.
 
 3. Support negative INTEGER values.
    Implement DER two's-complement INTEGER content encoding so the core builder is not limited to non-negative values.
@@ -39,6 +39,5 @@ with browser and Webview hosts.
 
 ## Current Focus
 
-The current implementation focus is module header tagging support. Automatic
-tag assignment should remain a separate follow-up so header parsing can land with
-small, reliable behavior first.
+The current implementation focus is expanding realistic PKI fixtures on top of
+module header and automatic tagging support.

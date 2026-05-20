@@ -47,6 +47,7 @@ The current core prototype supports these schema kinds:
 - references to defined types
 - low-form context-specific `EXPLICIT` and `IMPLICIT` tags, such as `[0] EXPLICIT UTF8String`
 - module tag defaults from `EXPLICIT TAGS`, `IMPLICIT TAGS`, and `AUTOMATIC TAGS` headers
+- automatic low-form context-specific tags for untagged `SEQUENCE`, `SET`, and `CHOICE` components
 - `DEFAULT` fields for `BOOLEAN`, `INTEGER`, and `ENUMERATED` values
 
 The ASN.1 definition parser currently accepts simple modules shaped like:
@@ -82,9 +83,10 @@ END
 ```
 
 When a module uses `EXPLICIT TAGS` or `IMPLICIT TAGS`, manually tagged types can
-omit `EXPLICIT` or `IMPLICIT` and the module default is applied. `AUTOMATIC TAGS`
-is recorded in the Schema Model, but automatic component tag assignment is still
-planned work.
+omit `EXPLICIT` or `IMPLICIT` and the module default is applied. When a module
+uses `AUTOMATIC TAGS`, untagged `SEQUENCE`, `SET`, and `CHOICE` components receive
+low-form context-specific implicit tags in field order while manually tagged
+components keep their existing tag numbers.
 
 Only context-specific low-form tag numbers from `0` through `30` are supported.
 Named enumerations and simple defaults are also supported:

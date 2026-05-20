@@ -39,14 +39,29 @@ END`);
     expect(bytesToHex(document.der)).toBe('300780010202023039');
   });
 
-  it('records AUTOMATIC TAGS and requires explicit mode for manual tags until auto assignment exists', () => {
+  it('automatically assigns IMPLICIT context-specific tags to untagged components', () => {
     const schema = parseAsn1Definition(`AutomaticHeader DEFINITIONS AUTOMATIC TAGS ::= BEGIN
-Name ::= UTF8String
+AutomaticRecord ::= SEQUENCE {
+  name UTF8String,
+  age INTEGER OPTIONAL,
+  email [5] IA5String OPTIONAL
+}
 END`);
 
     expect(schema.tagDefault).toBe('automatic');
-    expect(() => parseAsn1Definition(`AutomaticHeader DEFINITIONS AUTOMATIC TAGS ::= BEGIN
-Name ::= [0] UTF8String
-END`)).toThrow('AUTOMATIC TAGS does not yet infer a mode');
+    expect(schema.types[0]).toMatchObject({
+      name: 'AutomaticRecord',
+      type: {
+        kind: 'sequence',
+        fields: [
+          { name: 'name', type: { kind: 'tagged', tag: { class: 'context', number: 0, mode: 'implicit' } } },
+          { name: 'age', type: { kind: 'tagged', tag: { class: 'context', number: 1, mode: 'implicit' } }, optional: true },
+          { name: 'email', type: { kind: 'tagged', tag: { class: 'context', number: 5, mode: 'implicit' } }, optional: true }
+        ]
+      }
+    });
+
+    const document = createInstance(schema, 'AutomaticRecord', { name: 'Alice', age: 42, email: 'alice@example.test' });
+    expect(bytesToHex(document.der)).toBe('301e8005416c69636581012a8512616c696365406578616d706c652e74657374');
   });
 });
