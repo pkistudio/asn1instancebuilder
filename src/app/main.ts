@@ -1,4 +1,4 @@
-import { bytesToHex, createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, type Asn1SchemaModule } from '../core';
+import { bytesToHex, createInstance, exampleDefinition, exampleInput, exampleSchema, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
 
 declare const __ASN1_INSTANCE_BUILDER_VERSION__: string;
 
@@ -25,6 +25,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
   const outputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="output"]');
+  const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const status = mustFind<HTMLElement>(mount, '[data-role="status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
   const viewerMount = mustFind<HTMLElement>(mount, '[data-role="viewer"]');
@@ -45,20 +46,45 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
   const app: Asn1InstanceBuilderApp = {
     async build() {
+      let handledDiagnosticError = false;
       try {
         schema = parseDefinitionInput(definitionText.value);
-        input = JSON.parse(inputText.value) as unknown;
         refreshTypeSelect();
+        const schemaDiagnostics = validateSchemaModule(schema);
+        renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
+        if (hasDiagnosticErrors(schemaDiagnostics)) {
+          handledDiagnosticError = true;
+          outputText.value = '';
+          throw new Error('Schema diagnostics contain errors. Fix them before building DER.');
+        }
+
+        input = JSON.parse(inputText.value) as unknown;
         const typeName = typeSelect.value || schema.types[0]?.name;
         if (!typeName) throw new Error('The schema does not define any ASN.1 types.');
+        const instanceDiagnostics = validateInstance(schema, typeName, input);
+        renderDiagnostics(diagnosticsList, [
+          { title: 'Schema', diagnostics: schemaDiagnostics },
+          { title: 'Instance', diagnostics: instanceDiagnostics }
+        ]);
+        if (hasDiagnosticErrors(instanceDiagnostics)) {
+          handledDiagnosticError = true;
+          outputText.value = '';
+          throw new Error('Instance diagnostics contain errors. Fix the input before building DER.');
+        }
+
         const document = createInstance(schema, typeName, input);
         outputText.value = bytesToHex(document.der);
-        status.textContent = `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
+        const warningCount = [...schemaDiagnostics, ...instanceDiagnostics].filter((diagnostic) => diagnostic.severity === 'warning').length;
+        status.textContent = warningCount > 0 ? `Built ${document.typeName} as ${document.der.byteLength} DER bytes with ${warningCount} warning${warningCount === 1 ? '' : 's'}.` : `Built ${document.typeName} as ${document.der.byteLength} DER bytes.`;
         viewer ??= await initViewer(viewerMount);
         viewer?.loadBytes(document.der, `Loaded ${document.typeName} from ASN.1 Instance Builder.`);
         await parseGeneratedDer(document.der);
       } catch (error) {
+        outputText.value = '';
         status.textContent = error instanceof Error ? error.message : String(error);
+        if (!handledDiagnosticError) {
+          renderDiagnostics(diagnosticsList, [{ title: 'Build', diagnostics: [diagnosticFromError(error)] }]);
+        }
       }
     },
     loadSchema(nextSchema) {
@@ -100,6 +126,8 @@ function renderShell(): string {
         <textarea data-role="input" spellcheck="false"></textarea>
         <div class="asn1ib-output-label">DER HEX</div>
         <textarea data-role="output" spellcheck="false" readonly></textarea>
+        <div class="asn1ib-output-label">Diagnostics</div>
+        <div data-role="diagnostics" class="asn1ib-diagnostics" aria-live="polite"></div>
       </section>
       <section class="asn1ib-panel asn1ib-viewer-panel">
         <div class="asn1ib-panel-title">PkiStudioJS Viewer</div>
@@ -114,6 +142,62 @@ function parseDefinitionInput(value: string): Asn1SchemaModule {
   const trimmed = value.trim();
   if (trimmed.startsWith('{')) return JSON.parse(trimmed) as Asn1SchemaModule;
   return parseAsn1Definition(trimmed);
+}
+
+type AppDiagnostic = SchemaDiagnostic | InstanceDiagnostic;
+
+interface DiagnosticSection {
+  title: string;
+  diagnostics: AppDiagnostic[];
+}
+
+function renderDiagnostics(container: HTMLElement, sections: DiagnosticSection[]): void {
+  container.innerHTML = '';
+  const populatedSections = sections.filter((section) => section.diagnostics.length > 0);
+  if (populatedSections.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'asn1ib-diagnostics-empty';
+    empty.textContent = 'No diagnostics.';
+    container.append(empty);
+    return;
+  }
+
+  for (const section of populatedSections) {
+    const sectionElement = document.createElement('section');
+    sectionElement.className = 'asn1ib-diagnostics-section';
+    const title = document.createElement('div');
+    title.className = 'asn1ib-diagnostics-title';
+    title.textContent = section.title;
+    sectionElement.append(title);
+
+    const list = document.createElement('ul');
+    for (const diagnostic of section.diagnostics) {
+      const item = document.createElement('li');
+      item.className = `asn1ib-diagnostic asn1ib-diagnostic-${diagnostic.severity}`;
+      item.textContent = formatDiagnostic(diagnostic);
+      list.append(item);
+    }
+    sectionElement.append(list);
+    container.append(sectionElement);
+  }
+}
+
+function formatDiagnostic(diagnostic: AppDiagnostic): string {
+  const path = diagnostic.path.length > 0 ? ` at ${diagnostic.path.join('.')}` : '';
+  return `${diagnostic.severity.toUpperCase()} ${diagnostic.code}${path}: ${diagnostic.message}`;
+}
+
+function hasDiagnosticErrors(diagnostics: AppDiagnostic[]): boolean {
+  return diagnostics.some((diagnostic) => diagnostic.severity === 'error');
+}
+
+function diagnosticFromError(error: unknown): AppDiagnostic {
+  return {
+    severity: 'error',
+    code: 'build-error',
+    message: error instanceof Error ? error.message : String(error),
+    path: []
+  };
 }
 
 async function initViewer(mount: HTMLElement): Promise<{ loadBytes(bytes: Uint8Array, notice?: string): void; setEditable(editable: boolean): void } | null> {
