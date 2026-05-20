@@ -25,6 +25,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   mount.innerHTML = renderShell();
 
   const definitionText = mustFind<HTMLTextAreaElement>(mount, '[data-role="definition"]');
+  const definitionFileInput = mustFind<HTMLInputElement>(mount, '[data-role="definition-file"]');
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
@@ -35,6 +36,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
+  const loadDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-file"]');
+  const loadDefinitionClipboardButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-clipboard"]');
+  const saveDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="save-definition-file"]');
   const definitionStatus = mustFind<HTMLElement>(mount, '[data-role="definition-status"]');
   const buildStatus = mustFind<HTMLElement>(mount, '[data-role="build-status"]');
   const buildButton = mustFind<HTMLButtonElement>(mount, '[data-role="build"]');
@@ -49,6 +53,23 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   initializeWorkspaceResizer(mount, workspace, workspaceResizer);
   initializeDiagnosticsResizer(mount, rightStack, diagnosticsResizer);
   initializeApiLogResizer(mount, apiLogResizer);
+
+  const loadDefinitionText = (text: string, source: string) => {
+    definitionText.value = text;
+    try {
+      schema = parseDefinitionInput(text);
+      refreshTypeSelect();
+      const schemaDiagnostics = validateSchemaModule(schema);
+      renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
+      definitionStatus.textContent = schemaDiagnostics.length > 0 ? `Loaded from ${source}. Definition diagnostics: ${formatDiagnosticSummary(schemaDiagnostics)}` : `Loaded ${schema.types.length} ASN.1 type${schema.types.length === 1 ? '' : 's'} from ${source}.`;
+      buildStatus.textContent = 'Definition loaded. Build DER to update the generated output.';
+      appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'loadDefinition', detail: `${source}: ${formatDiagnosticSummary(schemaDiagnostics)}` });
+    } catch (error) {
+      definitionStatus.textContent = `Could not load definition from ${source}: ${error instanceof Error ? error.message : String(error)}`;
+      buildStatus.textContent = 'Build status is waiting for a valid definition.';
+      appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'loadDefinition-error', detail: definitionStatus.textContent });
+    }
+  };
 
   const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
     typeSelect.innerHTML = '';
@@ -130,6 +151,31 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     apiLogEntries.splice(0);
     renderApiLog(apiLog, apiLogEntries);
   });
+  loadDefinitionFileButton.addEventListener('click', () => definitionFileInput.click());
+  loadDefinitionClipboardButton.addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      loadDefinitionText(text, 'clipboard');
+    } catch (error) {
+      definitionStatus.textContent = `Could not read definition from clipboard: ${error instanceof Error ? error.message : String(error)}`;
+      appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'clipboard-read-error', detail: definitionStatus.textContent });
+    }
+  });
+  saveDefinitionFileButton.addEventListener('click', () => {
+    saveTextFile(definitionText.value, 'asn1-definition.asn1');
+    appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinition', detail: 'Saved the definition text to asn1-definition.asn1.' });
+  });
+  definitionFileInput.addEventListener('change', async () => {
+    const file = definitionFileInput.files?.[0];
+    definitionFileInput.value = '';
+    if (!file) return;
+    try {
+      loadDefinitionText(await file.text(), file.name);
+    } catch (error) {
+      definitionStatus.textContent = `Could not read definition file: ${error instanceof Error ? error.message : String(error)}`;
+      appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'file-read-error', detail: definitionStatus.textContent });
+    }
+  });
   buildButton.addEventListener('click', () => void app.build());
   aboutButton.addEventListener('click', () => {
     if (typeof aboutDialog.showModal === 'function') {
@@ -155,12 +201,24 @@ function renderShell(): string {
     <main class="asn1ib-workspace" data-role="workspace">
       <section class="asn1ib-panel asn1ib-definition-panel">
         <nav class="asn1ib-pane-menu" aria-label="Definition actions">
-          <button type="button" disabled>Load</button>
-          <button type="button" disabled>Save</button>
+          <div class="asn1ib-menu-item">
+            <button type="button" aria-haspopup="menu">Load</button>
+            <div class="asn1ib-submenu" role="menu">
+              <button type="button" role="menuitem" data-role="load-definition-file">from File</button>
+              <button type="button" role="menuitem" data-role="load-definition-clipboard">from Clipboard</button>
+            </div>
+          </div>
+          <div class="asn1ib-menu-item">
+            <button type="button" aria-haspopup="menu">Save</button>
+            <div class="asn1ib-submenu" role="menu">
+              <button type="button" role="menuitem" data-role="save-definition-file">to File</button>
+            </div>
+          </div>
           <button type="button" disabled>Close</button>
         </nav>
         <div class="asn1ib-left-card">
-          <textarea data-role="definition" spellcheck="false"></textarea>
+          <textarea data-role="definition" spellcheck="false" readonly></textarea>
+          <input data-role="definition-file" type="file" accept=".asn1,.txt,.json,application/json,text/plain" hidden />
           <p class="asn1ib-notice asn1ib-definition-status" data-role="definition-status">Definition input is ready.</p>
         </div>
       </section>
@@ -404,6 +462,18 @@ function setDiagnosticsPaneHeight(rightStack: HTMLElement, height: number, minHe
   const maxHeight = Math.max(minHeight, bounds.height - minInstanceHeight - 18);
   const nextHeight = clamp(height, minHeight, maxHeight);
   rightStack.style.setProperty('--diagnostics-pane-height', `${nextHeight}px`);
+}
+
+function saveTextFile(text: string, filename: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function initializeApiLogResizer(root: HTMLElement, resizer: HTMLElement): void {
