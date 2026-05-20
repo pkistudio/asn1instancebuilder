@@ -28,7 +28,7 @@ The intended flow is:
 The current core prototype supports these schema kinds:
 
 - `BOOLEAN`
-- non-negative `INTEGER`
+- non-negative `INTEGER`, including named integer values such as `v1(0)`
 - `BIT STRING`
 - `OCTET STRING`
 - `NULL`
@@ -90,6 +90,21 @@ Default fields are omitted when the instance omits the field or provides the
 same value as the default. Constraints, extension markers, parameterized types,
 value assignments, macros, and full module imports are planned but not part of
 this parser slice.
+
+Named integer values support X.509-style definitions:
+
+```asn1
+Version ::= INTEGER {
+	v1(0),
+	v2(1),
+	v3(2)
+}
+
+TBSCertificatePrefix ::= SEQUENCE {
+	version [0] EXPLICIT Version DEFAULT v1,
+	serialNumber INTEGER
+}
+```
 
 ## Development
 

@@ -1,6 +1,5 @@
 export type Asn1PrimitiveKind =
   | 'boolean'
-  | 'integer'
   | 'bitString'
   | 'octetString'
   | 'null'
@@ -13,6 +12,7 @@ export type Asn1PrimitiveKind =
 
 export type Asn1Type =
   | { kind: Asn1PrimitiveKind }
+  | Asn1IntegerType
   | { kind: 'enumerated'; values: Asn1NamedNumber[] }
   | { kind: 'tagged'; tag: Asn1Tag; type: Asn1Type }
   | { kind: 'sequence'; fields: Asn1Field[] }
@@ -26,6 +26,11 @@ export interface Asn1Tag {
   class: 'context';
   number: number;
   mode: 'explicit' | 'implicit';
+}
+
+export interface Asn1IntegerType {
+  kind: 'integer';
+  values?: Asn1NamedNumber[];
 }
 
 export interface Asn1NamedNumber {

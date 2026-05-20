@@ -22,8 +22,7 @@ export function encodeValue(schemaModule: Asn1SchemaModule, type: Asn1Type, inpu
       if (typeof input !== 'boolean') throw new Asn1InstanceBuilderError('BOOLEAN expects a boolean value.');
       return encodeBoolean(input);
     case 'integer':
-      if (!isIntegerInput(input)) throw new Asn1InstanceBuilderError('INTEGER expects a number, bigint, or decimal string.');
-      return encodeInteger(input);
+      return encodeInteger(resolveIntegerInput(type, input));
     case 'bitString':
       return encodeBitStringInput(input);
     case 'octetString':
@@ -78,7 +77,7 @@ function encodeFields(schemaModule: Asn1SchemaModule, fields: Asn1Field[], input
       if (field.optional) continue;
       throw new Asn1InstanceBuilderError(`Missing required field: ${field.name}.`);
     }
-    if ('defaultValue' in field && valuesEqual(value, field.defaultValue)) continue;
+    if ('defaultValue' in field && fieldValueEqualsDefault(schemaModule, field.type, value, field.defaultValue)) continue;
     try {
       encoded.push(encodeValue(schemaModule, field.type, value));
     } catch (error) {
@@ -86,6 +85,17 @@ function encodeFields(schemaModule: Asn1SchemaModule, fields: Asn1Field[], input
     }
   }
   return encoded;
+}
+
+function resolveIntegerInput(type: Extract<Asn1Type, { kind: 'integer' }>, input: unknown): bigint | number | string {
+  if (typeof input === 'bigint') return input;
+  if (typeof input === 'number' && Number.isInteger(input)) return input;
+  if (typeof input === 'string') {
+    const named = type.values?.find((candidate) => candidate.name === input);
+    if (named) return named.value;
+    if (/^\d+$/.test(input)) return input;
+  }
+  throw new Asn1InstanceBuilderError('INTEGER expects a named value, number, bigint, or decimal string.');
 }
 
 function resolveEnumeratedInput(type: Extract<Asn1Type, { kind: 'enumerated' }>, input: unknown): number {
@@ -98,8 +108,25 @@ function resolveEnumeratedInput(type: Extract<Asn1Type, { kind: 'enumerated' }>,
   throw new Asn1InstanceBuilderError('ENUMERATED expects a named value or integer value.');
 }
 
-function valuesEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+function fieldValueEqualsDefault(schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, defaultValue: unknown): boolean {
+  const resolvedType = resolveTypeForDefault(schemaModule, type);
+  try {
+    if (resolvedType.kind === 'integer') {
+      return BigInt(resolveIntegerInput(resolvedType, value)) === BigInt(resolveIntegerInput(resolvedType, defaultValue));
+    }
+    if (resolvedType.kind === 'enumerated') {
+      return resolveEnumeratedInput(resolvedType, value) === resolveEnumeratedInput(resolvedType, defaultValue);
+    }
+  } catch {
+    return false;
+  }
+  return JSON.stringify(value) === JSON.stringify(defaultValue);
+}
+
+function resolveTypeForDefault(schemaModule: Asn1SchemaModule, type: Asn1Type): Asn1Type {
+  if (type.kind === 'tagged') return resolveTypeForDefault(schemaModule, type.type);
+  if (type.kind === 'defined') return resolveTypeForDefault(schemaModule, resolveDefinedType(schemaModule, type.typeName));
+  return type;
 }
 
 function encodeChoice(schemaModule: Asn1SchemaModule, alternatives: Asn1Field[], input: unknown): Uint8Array {
@@ -136,10 +163,6 @@ function normalizeBytesInput(input: unknown, typeName: string): Uint8Array {
     return normalizeBytes(input);
   }
   throw new Asn1InstanceBuilderError(`${typeName} expects HEX text, a number array, or Uint8Array.`);
-}
-
-function isIntegerInput(input: unknown): input is bigint | number | string {
-  return typeof input === 'bigint' || (typeof input === 'number' && Number.isInteger(input)) || (typeof input === 'string' && /^\d+$/.test(input));
 }
 
 function isRecord(input: unknown): input is Record<string, unknown> {

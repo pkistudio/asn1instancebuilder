@@ -8,7 +8,6 @@ interface Token {
 
 const primitiveTypes: Record<string, Asn1PrimitiveKind> = {
   BOOLEAN: 'boolean',
-  INTEGER: 'integer',
   NULL: 'null',
   UTF8STRING: 'utf8String',
   PRINTABLESTRING: 'printableString',
@@ -44,7 +43,7 @@ class DefinitionParser {
 
   private parseType(): Asn1Type {
     if (this.matchSymbol('[')) {
-      const tagNumber = this.expectNumber('context-specific tag number');
+      const tagNumber = this.expectTagNumber('context-specific tag number');
       this.expectSymbol(']');
       const mode = this.matchKeyword('EXPLICIT') ? 'explicit' : this.matchKeyword('IMPLICIT') ? 'implicit' : undefined;
       if (!mode) throw this.error('Expected EXPLICIT or IMPLICIT after context-specific tag.', this.peek());
@@ -67,6 +66,10 @@ class DefinitionParser {
     if (upperName === 'OBJECT') {
       this.expectKeyword('IDENTIFIER');
       return { kind: 'objectIdentifier' };
+    }
+
+    if (upperName === 'INTEGER') {
+      return this.isNextSymbol('{') ? { kind: 'integer', values: this.parseNamedNumberList() } : { kind: 'integer' };
     }
 
     if (upperName === 'SEQUENCE') {
@@ -132,7 +135,7 @@ class DefinitionParser {
       if (this.matchKeyword('FALSE')) return false;
       throw this.error('Expected TRUE or FALSE as BOOLEAN DEFAULT value.', this.peek());
     }
-    if (defaultType.kind === 'integer') return this.expectNumber('INTEGER DEFAULT value');
+    if (defaultType.kind === 'integer') return defaultType.values ? this.expectIdentifier('INTEGER DEFAULT value') : this.expectNumber('INTEGER DEFAULT value');
     if (defaultType.kind === 'enumerated' || defaultType.kind === 'defined') return this.expectIdentifier('ENUMERATED DEFAULT value');
     throw this.error('DEFAULT values are currently supported for BOOLEAN, INTEGER, and ENUMERATED fields only.', this.peek());
   }
@@ -146,6 +149,15 @@ class DefinitionParser {
   }
 
   private expectNumber(label: string): number {
+    const token = this.take();
+    if (!token || !/^\d+$/.test(token.value)) {
+      throw this.error(`Expected ${label}.`, token);
+    }
+    const value = Number.parseInt(token.value, 10);
+    return value;
+  }
+
+  private expectTagNumber(label: string): number {
     const token = this.take();
     if (!token || !/^\d+$/.test(token.value)) {
       throw this.error(`Expected ${label}.`, token);
@@ -186,6 +198,10 @@ class DefinitionParser {
     if (token?.value !== symbol) return false;
     this.index += 1;
     return true;
+  }
+
+  private isNextSymbol(symbol: string): boolean {
+    return this.peek()?.value === symbol;
   }
 
   private take(): Token | undefined {
