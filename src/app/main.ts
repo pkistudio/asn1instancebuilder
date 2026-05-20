@@ -30,6 +30,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const workspace = mustFind<HTMLElement>(mount, '[data-role="workspace"]');
   const workspaceResizer = mustFind<HTMLElement>(mount, '[data-role="workspace-resizer"]');
+  const rightStack = mustFind<HTMLElement>(mount, '[data-role="right-stack"]');
+  const diagnosticsResizer = mustFind<HTMLElement>(mount, '[data-role="diagnostics-resizer"]');
   const apiLog = mustFind<HTMLElement>(mount, '[data-role="api-log"]');
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
@@ -45,6 +47,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const apiLogEntries: ApiLogEntry[] = [];
 
   initializeWorkspaceResizer(mount, workspace, workspaceResizer);
+  initializeDiagnosticsResizer(mount, rightStack, diagnosticsResizer);
   initializeApiLogResizer(mount, apiLogResizer);
 
   const refreshTypeSelect = (preferredTypeName = typeSelect.value) => {
@@ -162,7 +165,7 @@ function renderShell(): string {
         </div>
       </section>
       <div data-role="workspace-resizer" class="asn1ib-workspace-resizer" role="separator" aria-label="Resize definition pane" aria-orientation="vertical" tabindex="0"></div>
-      <section class="asn1ib-right-stack">
+      <section class="asn1ib-right-stack" data-role="right-stack">
         <section class="asn1ib-panel asn1ib-instance-panel">
           <div class="asn1ib-panel-title">
             <span>Instance Input</span>
@@ -173,6 +176,7 @@ function renderShell(): string {
           </div>
           <textarea data-role="input" spellcheck="false"></textarea>
         </section>
+        <div data-role="diagnostics-resizer" class="asn1ib-pane-resizer" role="separator" aria-label="Resize diagnostics pane" aria-orientation="horizontal" tabindex="0"></div>
         <section class="asn1ib-diagnostics-panel">
           <nav class="asn1ib-pane-menu asn1ib-diagnostics-menu" aria-label="Diagnostics pane">
             <span>Diagnostics</span>
@@ -354,6 +358,52 @@ function setDefinitionPaneWidth(workspace: HTMLElement, width: number, minWidth:
   const maxWidth = Math.max(minWidth, bounds.width - minRightWidth - 18);
   const nextWidth = clamp(width, minWidth, maxWidth);
   workspace.style.setProperty('--definition-pane-width', `${nextWidth}px`);
+}
+
+function initializeDiagnosticsResizer(root: HTMLElement, rightStack: HTMLElement, resizer: HTMLElement): void {
+  const minHeight = 120;
+  const minInstanceHeight = 140;
+  let startY = 0;
+  let startHeight = 0;
+
+  const stopResize = () => {
+    root.classList.remove('resizing-inner-rows');
+    document.removeEventListener('pointermove', resize);
+    document.removeEventListener('pointerup', stopResize);
+  };
+
+  const resize = (event: PointerEvent) => {
+    setDiagnosticsPaneHeight(rightStack, startHeight - (event.clientY - startY), minHeight, minInstanceHeight);
+  };
+
+  resizer.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    startY = event.clientY;
+    startHeight = getDiagnosticsPaneHeight(rightStack);
+    root.classList.add('resizing-inner-rows');
+    document.addEventListener('pointermove', resize);
+    document.addEventListener('pointerup', stopResize, { once: true });
+  });
+
+  resizer.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowUp' ? 16 : -16;
+    setDiagnosticsPaneHeight(rightStack, getDiagnosticsPaneHeight(rightStack) + delta, minHeight, minInstanceHeight);
+  });
+}
+
+function getDiagnosticsPaneHeight(rightStack: HTMLElement): number {
+  const diagnosticsPane = rightStack.lastElementChild;
+  if (diagnosticsPane instanceof HTMLElement) return diagnosticsPane.getBoundingClientRect().height;
+  return Number.parseFloat(getComputedStyle(rightStack).getPropertyValue('--diagnostics-pane-height')) || 220;
+}
+
+function setDiagnosticsPaneHeight(rightStack: HTMLElement, height: number, minHeight: number, minInstanceHeight: number): void {
+  const bounds = rightStack.getBoundingClientRect();
+  const maxHeight = Math.max(minHeight, bounds.height - minInstanceHeight - 18);
+  const nextHeight = clamp(height, minHeight, maxHeight);
+  rightStack.style.setProperty('--diagnostics-pane-height', `${nextHeight}px`);
 }
 
 function initializeApiLogResizer(root: HTMLElement, resizer: HTMLElement): void {
