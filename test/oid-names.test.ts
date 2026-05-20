@@ -25,4 +25,8 @@ describe('OBJECT IDENTIFIER names', () => {
   it('leaves dotted decimal OIDs unchanged', () => {
     expect(resolveObjectIdentifierName('1.2.840.113549.1.1.1')).toBe('1.2.840.113549.1.1.1');
   });
+
+  it('resolves PKI extension OID names', () => {
+    expect(resolveObjectIdentifierName('authorityKeyIdentifier')).toBe('2.5.29.35');
+  });
 });

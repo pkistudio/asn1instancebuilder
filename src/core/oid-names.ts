@@ -13,6 +13,7 @@ export const builtInOidNames: Record<string, string> = {
   keyUsage: '2.5.29.15',
   subjectAltName: '2.5.29.17',
   basicConstraints: '2.5.29.19',
+  authorityKeyIdentifier: '2.5.29.35',
   extendedKeyUsage: '2.5.29.37'
 };
 
