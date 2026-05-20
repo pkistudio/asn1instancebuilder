@@ -1,5 +1,7 @@
+import { normalizeBytes } from './bytes';
 import { encodeValue, resolveDefinedType } from './instance-builder';
-import type { Asn1Field, Asn1SchemaModule, Asn1Type } from './schema-model';
+import { resolveObjectIdentifierName } from './oid-names';
+import type { Asn1Field, Asn1SchemaModule, Asn1Type, ByteInput } from './schema-model';
 
 export type InstanceDiagnosticSeverity = 'error' | 'warning';
 
@@ -92,12 +94,104 @@ function validateArrayItems(schemaModule: Asn1SchemaModule, elementType: Asn1Typ
 }
 
 function validateLeaf(schemaModule: Asn1SchemaModule, type: Asn1Type, input: unknown, path: string[]): InstanceDiagnostic[] {
+  const diagnostic = validateLeafShape(schemaModule, type, input, path);
+  if (diagnostic) return [diagnostic];
+
   try {
     encodeValue(schemaModule, type, input);
     return [];
   } catch (error) {
     return [diagnosticFromError('invalid-value', error, path)];
   }
+}
+
+function validateLeafShape(schemaModule: Asn1SchemaModule, type: Asn1Type, input: unknown, path: string[]): InstanceDiagnostic | null {
+  switch (type.kind) {
+    case 'objectIdentifier':
+      return validateObjectIdentifierInput(schemaModule, input, path);
+    case 'bitString':
+      return validateBitStringInput(input, path);
+    case 'octetString':
+      return validateByteInput(input, 'OCTET STRING', path);
+    case 'utcTime':
+      return validateTimeInput(input, 'utcTime', path);
+    case 'generalizedTime':
+      return validateTimeInput(input, 'generalizedTime', path);
+    default:
+      return null;
+  }
+}
+
+function validateObjectIdentifierInput(schemaModule: Asn1SchemaModule, input: unknown, path: string[]): InstanceDiagnostic | null {
+  if (typeof input !== 'string') {
+    return { severity: 'error', code: 'invalid-object-identifier', message: 'OBJECT IDENTIFIER expects a dotted decimal string or known OID name.', path };
+  }
+
+  const resolved = resolveObjectIdentifierName(input, schemaModule.oidNames);
+  if (!/^\d+(?:\.\d+)+$/.test(resolved)) {
+    return { severity: 'error', code: 'invalid-object-identifier', message: `Unknown OID name or invalid dotted decimal OBJECT IDENTIFIER: ${input}.`, path };
+  }
+
+  const arcs = resolved.split('.').map((part) => Number.parseInt(part, 10));
+  if (arcs.length < 2 || arcs.some((arc) => !Number.isInteger(arc) || arc < 0)) {
+    return { severity: 'error', code: 'invalid-object-identifier', message: 'OBJECT IDENTIFIER must contain at least two non-negative decimal arcs.', path };
+  }
+  if (arcs[0] > 2 || (arcs[0] < 2 && arcs[1] > 39)) {
+    return { severity: 'error', code: 'invalid-object-identifier', message: 'OBJECT IDENTIFIER has an invalid first or second arc.', path };
+  }
+
+  return null;
+}
+
+function validateBitStringInput(input: unknown, path: string[]): InstanceDiagnostic | null {
+  if (isRecord(input) && 'bytes' in input) {
+    const unusedBits = input.unusedBits;
+    if (unusedBits !== undefined && (typeof unusedBits !== 'number' || !Number.isInteger(unusedBits) || unusedBits < 0 || unusedBits > 7)) {
+      return { severity: 'error', code: 'invalid-bit-string', message: 'BIT STRING unused bits must be an integer between 0 and 7.', path: [...path, 'unusedBits'] };
+    }
+    return validateByteInput(input.bytes, 'BIT STRING', [...path, 'bytes']);
+  }
+
+  return validateByteInput(input, 'BIT STRING', path);
+}
+
+function validateByteInput(input: unknown, typeName: string, path: string[]): InstanceDiagnostic | null {
+  if (!isByteInputShape(input)) {
+    return { severity: 'error', code: 'invalid-byte-input', message: `${typeName} expects HEX text, a number array, Uint8Array, or a { hex }, { utf8 }, or { base64 } object.`, path };
+  }
+
+  try {
+    normalizeBytes(input);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = message.includes('Base64') ? 'invalid-base64' : message.includes('HEX') ? 'invalid-hex' : 'invalid-byte-input';
+    return { severity: 'error', code, message, path };
+  }
+}
+
+function validateTimeInput(input: unknown, kind: 'utcTime' | 'generalizedTime', path: string[]): InstanceDiagnostic | null {
+  if (typeof input !== 'string') {
+    return { severity: 'error', code: 'invalid-time', message: `${kind} expects a string.`, path };
+  }
+
+  const match = kind === 'utcTime' ? /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(input) : /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(input);
+  if (!match) {
+    const shape = kind === 'utcTime' ? 'YYMMDDHHMMSSZ' : 'YYYYMMDDHHMMSSZ';
+    return { severity: 'error', code: 'invalid-time', message: `${kind} expects DER time text in ${shape} form.`, path };
+  }
+
+  const offset = 2;
+  const month = Number.parseInt(match[offset], 10);
+  const day = Number.parseInt(match[offset + 1], 10);
+  const hour = Number.parseInt(match[offset + 2], 10);
+  const minute = Number.parseInt(match[offset + 3], 10);
+  const second = Number.parseInt(match[offset + 4], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) {
+    return { severity: 'error', code: 'invalid-time', message: `${kind} contains an out-of-range date or time component.`, path };
+  }
+
+  return null;
 }
 
 function diagnosticFromError(code: string, error: unknown, path: string[]): InstanceDiagnostic {
@@ -107,4 +201,13 @@ function diagnosticFromError(code: string, error: unknown, path: string[]): Inst
 
 function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === 'object' && input !== null && !Array.isArray(input);
+}
+
+function isByteInputShape(input: unknown): input is ByteInput {
+  return input instanceof Uint8Array ||
+    Array.isArray(input) ||
+    typeof input === 'string' ||
+    (isRecord(input) && typeof input.hex === 'string') ||
+    (isRecord(input) && typeof input.utf8 === 'string') ||
+    (isRecord(input) && typeof input.base64 === 'string');
 }

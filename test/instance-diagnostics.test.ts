@@ -5,6 +5,10 @@ const definition = `DiagnosticsExample DEFINITIONS ::= BEGIN
 Person ::= SEQUENCE {
   name UTF8String,
   age INTEGER,
+  payload OCTET STRING OPTIONAL,
+  flags BIT STRING OPTIONAL,
+  issuedAt UTCTime OPTIONAL,
+  expiresAt GeneralizedTime OPTIONAL,
   emails SEQUENCE OF IA5String OPTIONAL,
   contact CHOICE {
     email IA5String,
@@ -19,6 +23,10 @@ describe('instance diagnostics', () => {
     const diagnostics = validateInstance(schema, 'Person', {
       name: 'Alice',
       age: 42,
+      payload: { hex: 'deadbeef' },
+      flags: { bytes: { base64: 'oA==' }, unusedBits: 5 },
+      issuedAt: '260520000000Z',
+      expiresAt: '20270520000000Z',
       emails: ['alice@example.test'],
       contact: { selected: 'identifier', value: 'sha256WithRSAEncryption' }
     });
@@ -47,5 +55,26 @@ describe('instance diagnostics', () => {
   it('reports unknown top-level type names', () => {
     const schema = parseAsn1Definition(definition);
     expect(validateInstance(schema, 'Missing', {}).map((diagnostic) => diagnostic.code)).toEqual(['unknown-type']);
+  });
+
+  it('returns code-specific diagnostics for OID, binary, and time values', () => {
+    const schema = parseAsn1Definition(definition);
+    const diagnostics = validateInstance(schema, 'Person', {
+      name: 'Alice',
+      age: 42,
+      payload: { hex: 'abc' },
+      flags: { bytes: { base64: 'not base64' }, unusedBits: 9 },
+      issuedAt: '2026-05-20',
+      expiresAt: '20261320000000Z',
+      contact: { selected: 'identifier', value: 'unknownOidName' }
+    });
+
+    expect(diagnostics).toEqual([
+      { severity: 'error', code: 'invalid-hex', message: 'HEX input must contain an even number of digits.', path: ['payload'] },
+      { severity: 'error', code: 'invalid-bit-string', message: 'BIT STRING unused bits must be an integer between 0 and 7.', path: ['flags', 'unusedBits'] },
+      { severity: 'error', code: 'invalid-time', message: 'utcTime expects DER time text in YYMMDDHHMMSSZ form.', path: ['issuedAt'] },
+      { severity: 'error', code: 'invalid-time', message: 'generalizedTime contains an out-of-range date or time component.', path: ['expiresAt'] },
+      { severity: 'error', code: 'invalid-object-identifier', message: 'Unknown OID name or invalid dotted decimal OBJECT IDENTIFIER: unknownOidName.', path: ['contact', 'identifier'] }
+    ]);
   });
 });
