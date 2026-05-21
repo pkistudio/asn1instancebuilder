@@ -1,4 +1,4 @@
-import type { Asn1Field, Asn1NamedNumber, Asn1SchemaModule, Asn1Type } from './schema-model';
+import type { Asn1Field, Asn1NamedNumber, Asn1SchemaModule, Asn1Type } from './schema-model.js';
 
 export type SchemaDiagnosticSeverity = 'error' | 'warning';
 

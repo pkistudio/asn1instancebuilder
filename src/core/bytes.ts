@@ -1,4 +1,4 @@
-import type { ByteInput } from './schema-model';
+import type { ByteInput } from './schema-model.js';
 
 export function concatBytes(parts: Uint8Array[]): Uint8Array {
   const length = parts.reduce((sum, part) => sum + part.length, 0);
