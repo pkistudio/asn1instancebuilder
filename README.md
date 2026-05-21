@@ -6,7 +6,7 @@ fits the PKI Studio family style used by `pvkgadgets` and `certgadgets`: a small
 browser app for hands-on work, plus UI-independent core APIs that can be reused
 from other browser or Webview hosts.
 
-Current version: 0.1.0
+Current version: 0.1.1
 
 ## Current Direction
 
@@ -314,6 +314,9 @@ The npm exports follow the sibling PKI Studio packages:
 - `@pkistudio/asn1instancebuilder/core`
 - `@pkistudio/asn1instancebuilder/app`
 - `@pkistudio/asn1instancebuilder/styles.css`
+
+The published type declarations are emitted under `dist/types`, including the
+core public type entry at `dist/types/core.d.ts`.
 
 Host applications should keep file access, dialogs, persistence, and Webview
 lifecycle outside this package and pass host behavior through app options as the
