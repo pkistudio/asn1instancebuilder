@@ -6,7 +6,7 @@ fits the PKI Studio family style used by `pvkgadgets` and `certgadgets`: a small
 browser app for hands-on work, plus UI-independent core APIs that can be reused
 from other browser or Webview hosts.
 
-Current version: 0.1.1
+Current version: 0.1.2
 
 ## Current Direction
 

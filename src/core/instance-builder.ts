@@ -1,8 +1,8 @@
-import { normalizeBytes } from './bytes';
-import { encodeBitString, encodeBoolean, encodeEnumerated, encodeExplicitContextSpecificTag, encodeImplicitContextSpecificTag, encodeInteger, encodeNull, encodeObjectIdentifier, encodeOctetString, encodeSequence, encodeSet, encodeText } from './der';
-import { Asn1InstanceBuilderError, withPath } from './errors';
-import { resolveObjectIdentifierName } from './oid-names';
-import type { Asn1Field, Asn1SchemaModule, Asn1Type, BitStringInput, ByteInput, ChoiceInput, InstanceDocument } from './schema-model';
+import { normalizeBytes } from './bytes.js';
+import { encodeBitString, encodeBoolean, encodeEnumerated, encodeExplicitContextSpecificTag, encodeImplicitContextSpecificTag, encodeInteger, encodeNull, encodeObjectIdentifier, encodeOctetString, encodeSequence, encodeSet, encodeText } from './der.js';
+import { Asn1InstanceBuilderError, withPath } from './errors.js';
+import { resolveObjectIdentifierName } from './oid-names.js';
+import type { Asn1Field, Asn1SchemaModule, Asn1Type, BitStringInput, ByteInput, ChoiceInput, InstanceDocument } from './schema-model.js';
 
 export function createInstance(schemaModule: Asn1SchemaModule, typeName: string, input: unknown): InstanceDocument {
   const type = resolveDefinedType(schemaModule, typeName);

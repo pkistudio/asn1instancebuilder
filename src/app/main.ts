@@ -1,4 +1,4 @@
-import { createInstance, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core';
+import { createInstance, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
 import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
 import defaultsAndEnumeratedDefinition from '../../fixtures/defaults-and-enumerated.asn1?raw';
 import minimalCrlDefinition from '../../fixtures/minimal-crl.asn1?raw';

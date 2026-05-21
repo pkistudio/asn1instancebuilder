@@ -1,5 +1,5 @@
-import { Asn1InstanceBuilderError } from './errors';
-import type { Asn1Field, Asn1PrimitiveKind, Asn1SchemaModule, Asn1TagDefault, Asn1Type } from './schema-model';
+import { Asn1InstanceBuilderError } from './errors.js';
+import type { Asn1Field, Asn1PrimitiveKind, Asn1SchemaModule, Asn1TagDefault, Asn1Type } from './schema-model.js';
 
 interface Token {
   value: string;

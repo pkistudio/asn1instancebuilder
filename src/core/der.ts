@@ -1,4 +1,4 @@
-import { concatBytes } from './bytes';
+import { concatBytes } from './bytes.js';
 
 const universalTags = {
   boolean: 0x01,

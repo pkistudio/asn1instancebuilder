@@ -1,4 +1,4 @@
-import type { Asn1SchemaModule } from './schema-model';
+import type { Asn1SchemaModule } from './schema-model.js';
 
 export const exampleSchema: Asn1SchemaModule = {
   name: 'Example',

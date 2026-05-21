@@ -1,7 +1,7 @@
-import { normalizeBytes } from './bytes';
-import { encodeValue, resolveDefinedType } from './instance-builder';
-import { resolveObjectIdentifierName } from './oid-names';
-import type { Asn1Field, Asn1SchemaModule, Asn1Type, ByteInput } from './schema-model';
+import { normalizeBytes } from './bytes.js';
+import { encodeValue, resolveDefinedType } from './instance-builder.js';
+import { resolveObjectIdentifierName } from './oid-names.js';
+import type { Asn1Field, Asn1SchemaModule, Asn1Type, ByteInput } from './schema-model.js';
 
 export type InstanceDiagnosticSeverity = 'error' | 'warning';
 
