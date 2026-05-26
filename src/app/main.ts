@@ -80,7 +80,11 @@ const rdnSequenceSample = [relativeDistinguishedNameSample];
 const nameSample = pkiBundleSample.issuer;
 const timeSample = { selected: 'utcTime', value: '260520000000Z' };
 const validitySample = pkiBundleSample.validity;
-const subjectPublicKeyInfoSample = pkiBundleSample.subjectPublicKeyInfo;
+const sharedSubjectPublicKeyInfoSample = pkiBundleSample.subjectPublicKeyInfo as JsonObject;
+const subjectPublicKeyInfoSample = {
+  ...sharedSubjectPublicKeyInfoSample,
+  algorithm: { algorithm: 'rsaEncryption', parameters: null }
+};
 const extensionSample = pkiBundleSample.extension;
 const extensionsSample = [extensionSample];
 const attributeValueSample = { utf8: 'changeit' };
@@ -110,6 +114,12 @@ const pkiComponentSamples: SampleInputMap = {
   Extensions: extensionsSample
 };
 
+const sharedPkiComponentSamples: SampleInputMap = {
+  ...pkiComponentSamples,
+  AlgorithmIdentifier: pkiBundleSample.signature,
+  SubjectPublicKeyInfo: sharedSubjectPublicKeyInfoSample
+};
+
 const namedObjectDefinitions: NamedObjectDefinition[] = [
   { id: 'person', label: 'Person', typeName: 'Person', sourceName: 'person.asn1', definition: personDefinition, sampleInputs: { Person: personSample } },
   { id: 'tagged-person', label: 'TaggedPerson', typeName: 'TaggedPerson', sourceName: 'tagged-person.asn1', definition: taggedPersonDefinition, sampleInputs: { TaggedPerson: taggedPersonSample } },
@@ -122,7 +132,7 @@ const namedObjectDefinitions: NamedObjectDefinition[] = [
   { id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } },
   { id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } },
   { id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } },
-  { id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...pkiComponentSamples, PkiBundle: pkiBundleSample } }
+  { id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample } }
 ];
 
 export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions): Asn1InstanceBuilderApp {

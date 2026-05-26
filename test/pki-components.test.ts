@@ -1,53 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { bytesToHex, createInstance, parseAsn1Definition, validateInstance, validateSchemaModule } from '../src/core';
-
-const definition = `PkiComponentExample DEFINITIONS EXPLICIT TAGS ::= BEGIN
-AlgorithmIdentifier ::= SEQUENCE {
-  algorithm OBJECT IDENTIFIER,
-  parameters NULL OPTIONAL
-}
-AttributeTypeAndValue ::= SEQUENCE {
-  type OBJECT IDENTIFIER,
-  value DirectoryString
-}
-DirectoryString ::= CHOICE {
-  utf8String UTF8String,
-  printableString PrintableString
-}
-RelativeDistinguishedName ::= SET OF AttributeTypeAndValue
-RDNSequence ::= SEQUENCE OF RelativeDistinguishedName
-Name ::= CHOICE {
-  rdnSequence RDNSequence
-}
-Time ::= CHOICE {
-  utcTime UTCTime,
-  generalTime GeneralizedTime
-}
-Validity ::= SEQUENCE {
-  notBefore Time,
-  notAfter Time
-}
-SubjectPublicKeyInfo ::= SEQUENCE {
-  algorithm AlgorithmIdentifier,
-  subjectPublicKey BIT STRING
-}
-Extension ::= SEQUENCE {
-  extnID OBJECT IDENTIFIER,
-  critical BOOLEAN DEFAULT FALSE,
-  extnValue OCTET STRING
-}
-END`;
+import { bytesToHex, createInstance, parseAsn1Definition, pkiComponentDefinition, validateInstance, validateSchemaModule } from '../src/core';
 
 describe('PKI component fixtures', () => {
-  const schema = parseAsn1Definition(definition);
+  const schema = parseAsn1Definition(pkiComponentDefinition);
 
   it('validates the PKI component schema', () => {
     expect(validateSchemaModule(schema)).toEqual([]);
   });
 
+  it('exports the shared PKI component types used by PkiStudio packages', () => {
+    const typeNames = schema.types.map((definition) => definition.name);
+
+    expect(typeNames).toEqual(expect.arrayContaining([
+      'AlgorithmIdentifier',
+      'SubjectPublicKeyInfo',
+      'RSAPublicKey',
+      'SignatureValue',
+      'TBSCertificate',
+      'Certificate',
+      'CertificationRequest',
+      'PrivateKeyInfo',
+      'ContentInfo'
+    ]));
+  });
+
   it('builds AlgorithmIdentifier values with OID names', () => {
-    const document = createInstance(schema, 'AlgorithmIdentifier', { algorithm: 'sha256WithRSAEncryption', parameters: null });
+    const document = createInstance(schema, 'AlgorithmIdentifier', { algorithm: 'sha256WithRSAEncryption', parameters: { selected: 'null', value: null } });
     expect(bytesToHex(document.der)).toBe('300d06092a864886f70d01010b0500');
+  });
+
+  it('builds AlgorithmIdentifier values with named curve parameters', () => {
+    const document = createInstance(schema, 'AlgorithmIdentifier', { algorithm: '1.2.840.10045.2.1', parameters: { selected: 'namedCurve', value: '1.2.840.10045.3.1.7' } });
+    expect(bytesToHex(document.der)).toBe('301306072a8648ce3d020106082a8648ce3d030107');
   });
 
   it('builds Name values using RDNSequence and DirectoryString choices', () => {
@@ -68,7 +52,7 @@ describe('PKI component fixtures', () => {
 
   it('builds SubjectPublicKeyInfo values with BIT STRING input objects', () => {
     const document = createInstance(schema, 'SubjectPublicKeyInfo', {
-      algorithm: { algorithm: 'rsaEncryption', parameters: null },
+      algorithm: { algorithm: 'rsaEncryption', parameters: { selected: 'null', value: null } },
       subjectPublicKey: { bytes: { hex: '00' }, unusedBits: 0 }
     });
     expect(bytesToHex(document.der)).toBe('3013300d06092a864886f70d010101050003020000');
@@ -90,7 +74,7 @@ describe('PKI component fixtures', () => {
   });
 
   it('validates a composed PKI bundle instance', () => {
-    const bundleSchema = parseAsn1Definition(`${definition.replace('END', '')}
+    const bundleSchema = parseAsn1Definition(`${pkiComponentDefinition.replace('\nEND', '')}
 PkiBundle ::= SEQUENCE {
   signature AlgorithmIdentifier,
   issuer Name,
@@ -101,13 +85,13 @@ PkiBundle ::= SEQUENCE {
 END`);
 
     const input = {
-      signature: { algorithm: 'sha256WithRSAEncryption', parameters: null },
+      signature: { algorithm: 'sha256WithRSAEncryption', parameters: { selected: 'null', value: null } },
       issuer: { selected: 'rdnSequence', value: [[{ type: 'commonName', value: { selected: 'utf8String', value: 'Example CA' } }]] },
       validity: {
         notBefore: { selected: 'utcTime', value: '260520000000Z' },
         notAfter: { selected: 'utcTime', value: '270520000000Z' }
       },
-      subjectPublicKeyInfo: { algorithm: { algorithm: 'rsaEncryption', parameters: null }, subjectPublicKey: { bytes: { hex: '00' }, unusedBits: 0 } },
+      subjectPublicKeyInfo: { algorithm: { algorithm: 'rsaEncryption', parameters: { selected: 'null', value: null } }, subjectPublicKey: { bytes: { hex: '00' }, unusedBits: 0 } },
       extension: { extnID: 'basicConstraints', critical: true, extnValue: { hex: '30030101ff' } }
     };
 

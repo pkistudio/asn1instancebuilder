@@ -1,7 +1,7 @@
 {
   "signature": {
     "algorithm": "sha256WithRSAEncryption",
-    "parameters": null
+    "parameters": { "selected": "null", "value": null }
   },
   "issuer": {
     "selected": "rdnSequence",
@@ -21,7 +21,7 @@
   "subjectPublicKeyInfo": {
     "algorithm": {
       "algorithm": "rsaEncryption",
-      "parameters": null
+      "parameters": { "selected": "null", "value": null }
     },
     "subjectPublicKey": { "bytes": { "hex": "00" }, "unusedBits": 0 }
   },

@@ -4,6 +4,7 @@ export { validateInstance } from './instance-diagnostics.js';
 export { builtInOidNames, resolveObjectIdentifierName } from './oid-names.js';
 export { parseAsn1Definition } from './definition-parser.js';
 export { parseGeneratedDer } from './pkistudio-adapter.js';
+export { pkiComponentDefinition } from './pki-components.js';
 export { validateSchemaModule } from './schema-diagnostics.js';
 export { exampleDefinition, exampleInput, exampleSchema } from './example-schema.js';
 export type { InstanceDiagnostic, InstanceDiagnosticSeverity } from './instance-diagnostics.js';

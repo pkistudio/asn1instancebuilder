@@ -91,7 +91,8 @@ if (schemaDiagnostics.length === 0 && instanceDiagnostics.length === 0) {
 
 The Core API exposes the Schema Model, ASN.1 definition parser, diagnostics,
 DER builder, byte helpers, OID helpers, example data, and a PkiStudioJS adapter
-helper for generated DER parsing.
+helper for generated DER parsing. It also exports `pkiComponentDefinition`, a
+reusable PKI ASN.1 definition corpus shared by PkiStudio packages.
 
 For full API details, see [Core API](https://github.com/pkistudio/asn1instancebuilder/wiki/Core-API).
 
