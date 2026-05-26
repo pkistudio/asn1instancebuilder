@@ -10,7 +10,7 @@ Hosted viewer: https://pkistudio.github.io/asn1instancebuilder/
 
 Documentation: https://github.com/pkistudio/asn1instancebuilder/wiki
 
-Current version: 0.1.2
+Current version: 0.1.3
 
 The package keeps VS Code-specific file access, dialogs, persistence, and
 Webview lifecycle outside `@pkistudio/asn1instancebuilder`; hosts can mount the
