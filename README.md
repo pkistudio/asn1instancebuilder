@@ -10,7 +10,7 @@ Hosted viewer: https://pkistudio.github.io/asn1instancebuilder/
 
 Documentation: https://github.com/pkistudio/asn1instancebuilder/wiki
 
-Current version: 0.1.2
+Current version: 0.1.3
 
 The package keeps VS Code-specific file access, dialogs, persistence, and
 Webview lifecycle outside `@pkistudio/asn1instancebuilder`; hosts can mount the
@@ -91,7 +91,8 @@ if (schemaDiagnostics.length === 0 && instanceDiagnostics.length === 0) {
 
 The Core API exposes the Schema Model, ASN.1 definition parser, diagnostics,
 DER builder, byte helpers, OID helpers, example data, and a PkiStudioJS adapter
-helper for generated DER parsing.
+helper for generated DER parsing. It also exports `pkiComponentDefinition`, a
+reusable PKI ASN.1 definition corpus shared by PkiStudio packages.
 
 For full API details, see [Core API](https://github.com/pkistudio/asn1instancebuilder/wiki/Core-API).
 
