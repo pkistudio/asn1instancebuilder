@@ -115,6 +115,78 @@ Hosts can also pass an initial Schema Model and instance input, call
 `loadBundle(bundle, entryIdOrTypeName?)` on the returned app instance. The app
 entry also exports the `DefinitionBundle` and `UiProfile` TypeScript types.
 
+```ts
+import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';
+
+const rawAsn1Bundle: DefinitionBundle = {
+  id: 'pkistudio.example.person',
+  version: '1.0.0',
+  label: 'Person Example',
+  schema: {
+    format: 'asn1',
+    sourceName: 'person.asn1',
+    source: `Example DEFINITIONS ::= BEGIN
+
+Person ::= SEQUENCE {
+  name UTF8String,
+  age INTEGER OPTIONAL,
+  email IA5String OPTIONAL
+}
+
+END`
+  },
+  entries: [{
+    id: 'person',
+    typeName: 'Person',
+    sampleInput: { name: 'Alice', age: 42, email: 'alice@example.test' }
+  }]
+};
+
+app.loadBundle(rawAsn1Bundle, 'person');
+```
+
+Bundles can also carry a parsed Schema Model instead of raw ASN.1 text:
+
+```ts
+const schemaModelBundle: DefinitionBundle = {
+  id: 'pkistudio.example.person.schema-model',
+  version: '1.0.0',
+  label: 'Person Schema Model Example',
+  schema: {
+    format: 'schema-model',
+    schema: {
+      name: 'Example',
+      tagDefault: 'explicit',
+      types: [{
+        name: 'Person',
+        type: {
+          kind: 'sequence',
+          fields: [{ name: 'name', type: { kind: 'utf8String' } }]
+        }
+      }]
+    }
+  },
+  entries: [{
+    typeName: 'Person',
+    defaultInput: { name: 'Alice' },
+    uiProfile: {
+      id: 'person-profile',
+      typeName: 'Person',
+      fields: { name: { label: 'Full name', placeholder: 'Alice' } }
+    }
+  }]
+};
+
+app.loadBundle(schemaModelBundle);
+```
+
+UI Profiles only describe the input experience. Schema diagnostics, instance
+diagnostics, and DER generation continue to use the Schema Model and Instance
+JSON as the source of truth.
+
+See `fixtures/person.definition-bundle.json` for a complete raw ASN.1 bundle
+example.
+
 For mounting, app instance methods, host boundaries, and viewer routing, see
 [Embedding](https://github.com/pkistudio/asn1instancebuilder/wiki/Embedding).
 

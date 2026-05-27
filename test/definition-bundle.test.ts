@@ -17,6 +17,7 @@ const bundle: DefinitionBundle = {
       typeName: 'Person',
       label: 'Person',
       sampleInput: 'Alice',
+      defaultInput: 'Sample wins over this default',
       uiProfile: {
         id: 'person-profile',
         typeName: 'Person',
@@ -44,8 +45,15 @@ describe('Definition Bundle helpers', () => {
     expect(findDefinitionBundleEntry(bundle, 'Missing')).toBeUndefined();
   });
 
-  it('collects entry sample inputs by type name', () => {
+  it('collects entry sample inputs by type name with default input fallback', () => {
     expect(getDefinitionBundleSampleInputs(bundle)).toEqual({ Person: 'Alice', Fallback: 'Default value' });
+  });
+
+  it('ignores unknown bundle fields in helper behavior', () => {
+    const extendedBundle = { ...bundle, extensions: { source: 'downstream-host' } } as DefinitionBundle;
+
+    expect(findDefinitionBundleEntry(extendedBundle, 'person-default')?.sampleInput).toBe('Alice');
+    expect(getDefinitionBundleSampleInputs(extendedBundle).Person).toBe('Alice');
   });
 
   it('collects entry UI Profiles by type name', () => {
