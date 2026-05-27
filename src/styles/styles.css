@@ -544,6 +544,18 @@ textarea {
   font-family: Consolas, "Courier New", monospace;
 }
 
+.asn1ib-form-collapsed {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.asn1ib-form-collapsed > summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .asn1ib-form-array-header button,
 .asn1ib-form-array-item-header button {
   min-height: 26px;
