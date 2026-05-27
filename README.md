@@ -180,6 +180,16 @@ const schemaModelBundle: DefinitionBundle = {
 app.loadBundle(schemaModelBundle);
 ```
 
+The built-in `Load` -> `NamedObjects` examples are also exported as reusable
+Definition Bundles:
+
+```ts
+import { namedObjectDefinitionBundles } from '@pkistudio/asn1instancebuilder/app';
+
+const certificateBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'certificate');
+if (certificateBundle) app.loadBundle(certificateBundle, 'certificate');
+```
+
 UI Profiles only describe the input experience. Schema diagnostics, instance
 diagnostics, and DER generation continue to use the Schema Model and Instance
 JSON as the source of truth.
