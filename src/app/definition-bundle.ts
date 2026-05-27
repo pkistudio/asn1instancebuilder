@@ -3,28 +3,45 @@ import type { UiProfile } from './ui-profile.js';
 
 export type DefinitionBundleSchemaSource =
   | {
+  /** Raw ASN.1 module text parsed into a Schema Model before building DER. */
       format: 'asn1';
+      /** Optional display name for diagnostics and API log entries. */
       sourceName?: string;
       source: string;
     }
   | {
+      /** Already parsed Schema Model for hosts that own parsing or store schema JSON directly. */
       format: 'schema-model';
       schema: Asn1SchemaModule;
     };
 
+/** One loadable top-level type within a Definition Bundle. */
 export interface DefinitionBundleEntry {
+  /** Stable entry id for host menus or direct loadBundle selection. */
   id?: string;
+  /** Top-level ASN.1 type name to select after loading the bundle schema. */
   typeName: string;
   label?: string;
   description?: string;
+  /** Example Instance JSON loaded when the entry is selected. Takes precedence over defaultInput. */
   sampleInput?: unknown;
+  /** Initial Instance JSON used when no sampleInput exists for the entry type. */
   defaultInput?: unknown;
+  /** Optional form-rendering hints for this entry. UI metadata is not used for DER generation. */
   uiProfile?: UiProfile;
 }
 
-/** Internal package shape for schema, entries, sample inputs, and UI metadata. */
+/**
+ * Host-facing app package shape for schema, entries, sample inputs, and UI metadata.
+ *
+ * The Schema Model and Instance JSON remain the source of truth for diagnostics
+ * and DER generation. Unknown bundle fields are ignored by the current helpers
+ * so hosts can add private metadata without affecting app loading behavior.
+ */
 export interface DefinitionBundle {
+  /** Globally unique bundle id, usually reverse-DNS style. */
   id: string;
+  /** Bundle payload format version, independent from npm package version. */
   version: string;
   label: string;
   description?: string;
