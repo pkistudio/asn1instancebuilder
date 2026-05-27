@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDefinitionBundleEntry, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, type DefinitionBundle } from '../src/app/definition-bundle';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, type DefinitionBundle } from '../src/app/definition-bundle';
 
 const bundle: DefinitionBundle = {
   id: 'pkistudio.example.person',
@@ -8,6 +8,7 @@ const bundle: DefinitionBundle = {
   description: 'Example bundle for a Person type.',
   schema: {
     format: 'asn1',
+    sourceName: 'person.asn1',
     source: 'Example DEFINITIONS ::= BEGIN Person ::= UTF8String END'
   },
   entries: [
@@ -39,9 +40,14 @@ describe('Definition Bundle helpers', () => {
     expect(findDefinitionBundleEntry(bundle, 'Missing')).toBeUndefined();
   });
 
+  it('collects entry sample inputs by type name', () => {
+    expect(getDefinitionBundleSampleInputs(bundle)).toEqual({ Person: 'Alice' });
+  });
+
   it('narrows raw ASN.1 schema sources', () => {
     expect(isRawAsn1BundleSchemaSource(bundle.schema)).toBe(true);
     expect(isSchemaModelBundleSchemaSource(bundle.schema)).toBe(false);
+    if (isRawAsn1BundleSchemaSource(bundle.schema)) expect(bundle.schema.sourceName).toBe('person.asn1');
   });
 
   it('narrows parsed Schema Model sources', () => {
