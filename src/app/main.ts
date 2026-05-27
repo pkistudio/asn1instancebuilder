@@ -1,4 +1,5 @@
 import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, isRawAsn1BundleSchemaSource, type DefinitionBundle } from './definition-bundle.js';
 import { createDefaultInput, findChoiceAlternative, getValueAtPath, parseFormPath, removeValueAtPath, setFormControlValue, setValueAtPath, type JsonObject } from './form-model.js';
 import { readFormControlValue, renderInputForm, updateInputModeButtons, type InputMode } from './form-renderer.js';
 import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
@@ -43,7 +44,7 @@ export interface Asn1InstanceBuilderApp {
 const VIEWER_STORAGE_PREFIX = 'asn1ib-viewer-';
 const emptySchema: Asn1SchemaModule = { name: '', tagDefault: 'explicit', types: [] };
 
-interface NamedObjectDefinition {
+interface NamedObjectBundleInput {
   id: string;
   label: string;
   typeName: string;
@@ -51,6 +52,10 @@ interface NamedObjectDefinition {
   definition: string;
   sampleInputs: SampleInputMap;
 }
+
+type NamedObjectBundle = DefinitionBundle & {
+  schema: Extract<DefinitionBundle['schema'], { format: 'asn1' }> & { sourceName: string };
+};
 
 type SampleInputMap = Record<string, unknown>;
 
@@ -121,19 +126,38 @@ const sharedPkiComponentSamples: SampleInputMap = {
   SubjectPublicKeyInfo: sharedSubjectPublicKeyInfoSample
 };
 
-const namedObjectDefinitions: NamedObjectDefinition[] = [
-  { id: 'person', label: 'Person', typeName: 'Person', sourceName: 'person.asn1', definition: personDefinition, sampleInputs: { Person: personSample } },
-  { id: 'tagged-person', label: 'TaggedPerson', typeName: 'TaggedPerson', sourceName: 'tagged-person.asn1', definition: taggedPersonDefinition, sampleInputs: { TaggedPerson: taggedPersonSample } },
-  { id: 'binary-record', label: 'BinaryRecord', typeName: 'BinaryRecord', sourceName: 'binary-inputs.asn1', definition: binaryInputsDefinition, sampleInputs: { BinaryRecord: binaryRecordSample } },
-  { id: 'default-record', label: 'DefaultRecord', typeName: 'DefaultRecord', sourceName: 'defaults-and-enumerated.asn1', definition: defaultsAndEnumeratedDefinition, sampleInputs: { Status: 'warning', DefaultRecord: defaultRecordSample } },
-  { id: 'signed-record', label: 'SignedRecord', typeName: 'SignedRecord', sourceName: 'negative-integer.asn1', definition: negativeIntegerDefinition, sampleInputs: { Delta: 'minusOne', SignedRecord: signedRecordSample } },
-  { id: 'versioned-serial', label: 'VersionedSerial', typeName: 'VersionedSerial', sourceName: 'module-tags.asn1', definition: moduleTagsDefinition, sampleInputs: { Version: 'v3', VersionedSerial: x509VersionSample } },
-  { id: 'tbs-certificate-prefix', label: 'TBSCertificatePrefix', typeName: 'TBSCertificatePrefix', sourceName: 'x509-version.asn1', definition: x509VersionDefinition, sampleInputs: { Version: 'v3', TBSCertificatePrefix: x509VersionSample } },
-  { id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample } },
-  { id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } },
-  { id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } },
-  { id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } },
-  { id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample } }
+function createNamedObjectBundle(input: NamedObjectBundleInput): NamedObjectBundle {
+  return {
+    id: input.id,
+    version: '1.0.0',
+    label: input.label,
+    schema: {
+      format: 'asn1',
+      sourceName: input.sourceName,
+      source: input.definition
+    },
+    entries: Object.entries(input.sampleInputs).map(([typeName, sampleInput]) => ({
+      id: typeName === input.typeName ? input.id : undefined,
+      typeName,
+      label: typeName === input.typeName ? input.label : typeName,
+      sampleInput
+    }))
+  };
+}
+
+const namedObjectBundles: NamedObjectBundle[] = [
+  createNamedObjectBundle({ id: 'person', label: 'Person', typeName: 'Person', sourceName: 'person.asn1', definition: personDefinition, sampleInputs: { Person: personSample } }),
+  createNamedObjectBundle({ id: 'tagged-person', label: 'TaggedPerson', typeName: 'TaggedPerson', sourceName: 'tagged-person.asn1', definition: taggedPersonDefinition, sampleInputs: { TaggedPerson: taggedPersonSample } }),
+  createNamedObjectBundle({ id: 'binary-record', label: 'BinaryRecord', typeName: 'BinaryRecord', sourceName: 'binary-inputs.asn1', definition: binaryInputsDefinition, sampleInputs: { BinaryRecord: binaryRecordSample } }),
+  createNamedObjectBundle({ id: 'default-record', label: 'DefaultRecord', typeName: 'DefaultRecord', sourceName: 'defaults-and-enumerated.asn1', definition: defaultsAndEnumeratedDefinition, sampleInputs: { Status: 'warning', DefaultRecord: defaultRecordSample } }),
+  createNamedObjectBundle({ id: 'signed-record', label: 'SignedRecord', typeName: 'SignedRecord', sourceName: 'negative-integer.asn1', definition: negativeIntegerDefinition, sampleInputs: { Delta: 'minusOne', SignedRecord: signedRecordSample } }),
+  createNamedObjectBundle({ id: 'versioned-serial', label: 'VersionedSerial', typeName: 'VersionedSerial', sourceName: 'module-tags.asn1', definition: moduleTagsDefinition, sampleInputs: { Version: 'v3', VersionedSerial: x509VersionSample } }),
+  createNamedObjectBundle({ id: 'tbs-certificate-prefix', label: 'TBSCertificatePrefix', typeName: 'TBSCertificatePrefix', sourceName: 'x509-version.asn1', definition: x509VersionDefinition, sampleInputs: { Version: 'v3', TBSCertificatePrefix: x509VersionSample } }),
+  createNamedObjectBundle({ id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample } }),
+  createNamedObjectBundle({ id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } }),
+  createNamedObjectBundle({ id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } }),
+  createNamedObjectBundle({ id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } }),
+  createNamedObjectBundle({ id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample } })
 ];
 
 export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions): Asn1InstanceBuilderApp {
@@ -503,12 +527,16 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   });
   for (const button of namedObjectButtons) {
     button.addEventListener('click', () => {
-      const namedObject = namedObjectDefinitions.find((definition) => definition.id === button.dataset.objectId);
-      if (!namedObject) return;
-      const loaded = loadDefinitionText(namedObject.definition, `NamedObjects: ${namedObject.label} (${namedObject.sourceName})`, namedObject.typeName);
+      const namedObject = namedObjectBundles.find((bundle) => bundle.id === button.dataset.objectId);
+      if (!namedObject || !isRawAsn1BundleSchemaSource(namedObject.schema)) return;
+      const primaryEntry = findDefinitionBundleEntry(namedObject, namedObject.id);
+      const typeName = primaryEntry?.typeName ?? namedObject.entries[0]?.typeName;
+      if (!typeName) return;
+      const sourceName = namedObject.schema.sourceName ?? namedObject.id;
+      const loaded = loadDefinitionText(namedObject.schema.source, `NamedObjects: ${namedObject.label} (${sourceName})`, typeName);
       if (loaded) {
-        activeSampleInputs = namedObject.sampleInputs;
-        loadSampleInputForType(namedObject.typeName);
+        activeSampleInputs = getDefinitionBundleSampleInputs(namedObject);
+        loadSampleInputForType(typeName);
       }
       closeMenuAfterSelection(button, definitionText);
     });
@@ -629,7 +657,7 @@ function renderShell(): string {
 }
 
 function renderNamedObjectMenuItems(): string {
-  return namedObjectDefinitions.map((definition) => `<button type="button" role="menuitem" data-role="load-named-object" data-object-id="${definition.id}">${definition.label}</button>`).join('');
+  return namedObjectBundles.map((bundle) => `<button type="button" role="menuitem" data-role="load-named-object" data-object-id="${bundle.id}">${bundle.label}</button>`).join('');
 }
 
 function closeMenuAfterSelection(button: HTMLButtonElement, focusTarget: HTMLElement): void {

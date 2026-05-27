@@ -4,6 +4,7 @@ import type { UiProfile } from './ui-profile.js';
 export type DefinitionBundleSchemaSource =
   | {
       format: 'asn1';
+      sourceName?: string;
       source: string;
     }
   | {
@@ -33,6 +34,16 @@ export interface DefinitionBundle {
 
 export function findDefinitionBundleEntry(bundle: DefinitionBundle, idOrTypeName: string): DefinitionBundleEntry | undefined {
   return bundle.entries.find((entry) => entry.id === idOrTypeName) ?? bundle.entries.find((entry) => entry.typeName === idOrTypeName);
+}
+
+export function getDefinitionBundleSampleInputs(bundle: DefinitionBundle): Record<string, unknown> {
+  const sampleInputs: Record<string, unknown> = {};
+  for (const entry of bundle.entries) {
+    if ('sampleInput' in entry && !Object.prototype.hasOwnProperty.call(sampleInputs, entry.typeName)) {
+      sampleInputs[entry.typeName] = entry.sampleInput;
+    }
+  }
+  return sampleInputs;
 }
 
 export function isRawAsn1BundleSchemaSource(source: DefinitionBundleSchemaSource): source is Extract<DefinitionBundleSchemaSource, { format: 'asn1' }> {
