@@ -1,7 +1,14 @@
 import { createDefaultInput, isPlainObject, resolveEditableType, stringifyFormPath, type FormPathSegment } from './form-model.js';
+import { getUiFieldProfile, type UiFieldProfile, type UiProfile, type UiProfileInputMode } from './ui-profile.js';
 import type { Asn1Field, Asn1NamedNumber, Asn1SchemaModule, Asn1Type, InstanceDiagnostic } from '../core.js';
 
 export type InputMode = 'form' | 'json';
+
+interface RenderContext {
+  schemaModule: Asn1SchemaModule;
+  diagnostics: InstanceDiagnostic[];
+  uiProfile?: UiProfile;
+}
 
 export function updateInputModeButtons(buttons: HTMLButtonElement[], mode: InputMode): void {
   for (const button of buttons) {
@@ -11,9 +18,9 @@ export function updateInputModeButtons(buttons: HTMLButtonElement[], mode: Input
   }
 }
 
-export function renderInputForm(container: HTMLElement, schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, diagnostics: InstanceDiagnostic[]): void {
+export function renderInputForm(container: HTMLElement, schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, diagnostics: InstanceDiagnostic[], uiProfile?: UiProfile): void {
   container.innerHTML = '';
-  container.append(renderValueEditor(schemaModule, type, value, [], diagnostics, 'Value'));
+  container.append(renderValueEditor({ schemaModule, diagnostics, uiProfile }, type, value, [], 'Value'));
 }
 
 export function readFormControlValue(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): unknown {
@@ -23,34 +30,41 @@ export function readFormControlValue(control: HTMLInputElement | HTMLTextAreaEle
   return control.value;
 }
 
-function renderValueEditor(schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
-  const resolved = resolveEditableType(schemaModule, type);
+function renderValueEditor(context: RenderContext, type: Asn1Type, value: unknown, path: FormPathSegment[], label: string): HTMLElement {
+  const fieldProfile = getUiFieldProfile(context.uiProfile, path);
+  if (fieldProfile?.hidden) return renderHiddenField();
+  const resolved = resolveEditableType(context.schemaModule, type);
+  const displayLabel = fieldProfile?.label ?? label;
   switch (resolved.kind) {
     case 'sequence':
     case 'set':
-      return renderFieldGroup(schemaModule, resolved.fields, value, path, diagnostics, label);
+      return renderFieldGroup(context, resolved.fields, value, path, displayLabel);
     case 'choice':
-      return renderChoiceEditor(schemaModule, resolved, value, path, diagnostics, label);
+      return renderChoiceEditor(context, resolved, value, path, displayLabel);
     case 'sequenceOf':
     case 'setOf':
-      return renderArrayEditor(schemaModule, resolved.elementType, value, path, diagnostics, label);
+      return renderArrayEditor(context, resolved.elementType, value, path, displayLabel);
     case 'bitString':
-      return renderBitStringEditor(value, path, diagnostics, label);
+      return renderBitStringEditor(context, value, path, displayLabel);
     case 'octetString':
-      return renderByteEditor(value, path, diagnostics, label, 'OCTET STRING');
+      return renderByteEditor(context, value, path, displayLabel, 'OCTET STRING');
     default:
-      return renderPrimitiveEditor(resolved, value, path, diagnostics, label, schemaModule);
+      return renderPrimitiveEditor(context, resolved, value, path, displayLabel);
   }
 }
 
-function renderFieldGroup(schemaModule: Asn1SchemaModule, fields: Asn1Field[], value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+function renderFieldGroup(context: RenderContext, fields: Asn1Field[], value: unknown, path: FormPathSegment[], label: string): HTMLElement {
   const group = document.createElement('section');
   group.className = 'asn1ib-form-group';
   group.append(renderFormLegend(label));
+  appendProfileDescription(group, getUiFieldProfile(context.uiProfile, path));
   const objectValue = isPlainObject(value) ? value : {};
 
-  for (const field of fields) {
+  for (const field of sortFieldsByProfileOrder(fields, path, context.uiProfile)) {
     const fieldPath = [...path, field.name];
+    const fieldProfile = getUiFieldProfile(context.uiProfile, fieldPath);
+    if (fieldProfile?.hidden) continue;
+    const fieldLabel = fieldProfile?.label ?? field.name;
     const hasValue = Object.prototype.hasOwnProperty.call(objectValue, field.name);
     const row = document.createElement('section');
     row.className = 'asn1ib-form-field';
@@ -58,7 +72,7 @@ function renderFieldGroup(schemaModule: Asn1SchemaModule, fields: Asn1Field[], v
     const header = document.createElement('div');
     header.className = 'asn1ib-form-field-header';
     const title = document.createElement('span');
-    title.textContent = field.name;
+    title.textContent = fieldLabel;
     header.append(title);
 
     if (field.optional || 'defaultValue' in field) {
@@ -74,26 +88,25 @@ function renderFieldGroup(schemaModule: Asn1SchemaModule, fields: Asn1Field[], v
       header.append(toggleLabel);
     }
     row.append(header);
+    appendProfileDescription(row, fieldProfile);
 
-    if (hasValue || (!field.optional && !('defaultValue' in field))) {
-      row.append(renderValueEditor(schemaModule, field.type, objectValue[field.name], fieldPath, diagnostics, field.name));
-    } else if ('defaultValue' in field) {
-      row.append(renderFormHint('Using ASN.1 DEFAULT value.'));
-    } else {
-      row.append(renderFormHint('Optional field omitted.'));
-    }
-    appendFieldDiagnostics(row, diagnostics, fieldPath);
+    const fieldBody = hasValue || (!field.optional && !('defaultValue' in field))
+      ? renderValueEditor(context, field.type, objectValue[field.name], fieldPath, field.name)
+      : renderFormHint('defaultValue' in field ? 'Using ASN.1 DEFAULT value.' : 'Optional field omitted.');
+    row.append(fieldProfile?.collapsed ? renderCollapsedFieldBody(fieldLabel, fieldBody) : fieldBody);
+    appendFieldDiagnostics(row, context.diagnostics, fieldPath);
     group.append(row);
   }
 
-  appendFieldDiagnostics(group, diagnostics, path);
+  appendFieldDiagnostics(group, context.diagnostics, path);
   return group;
 }
 
-function renderChoiceEditor(schemaModule: Asn1SchemaModule, type: Extract<Asn1Type, { kind: 'choice' }>, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+function renderChoiceEditor(context: RenderContext, type: Extract<Asn1Type, { kind: 'choice' }>, value: unknown, path: FormPathSegment[], label: string): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'asn1ib-form-choice';
   wrapper.append(renderFormLegend(label));
+  appendProfileDescription(wrapper, getUiFieldProfile(context.uiProfile, path));
   const choiceValue = isPlainObject(value) ? value : { selected: type.alternatives[0]?.name, value: undefined };
   const selectedName = typeof choiceValue.selected === 'string' ? choiceValue.selected : type.alternatives[0]?.name ?? '';
   const selected = type.alternatives.find((alternative) => alternative.name === selectedName) ?? type.alternatives[0];
@@ -117,19 +130,20 @@ function renderChoiceEditor(schemaModule: Asn1SchemaModule, type: Extract<Asn1Ty
   wrapper.append(selectRow);
 
   if (selected) {
-    const nestedValue = selectedName === choiceValue.selected && 'value' in choiceValue ? choiceValue.value : createDefaultInput(schemaModule, selected.type);
-    wrapper.append(renderValueEditor(schemaModule, selected.type, nestedValue, [...path, 'value'], diagnostics, selected.name));
+    const nestedValue = selectedName === choiceValue.selected && 'value' in choiceValue ? choiceValue.value : createDefaultInput(context.schemaModule, selected.type);
+    wrapper.append(renderValueEditor(context, selected.type, nestedValue, [...path, 'value'], selected.name));
   }
-  appendFieldDiagnostics(wrapper, diagnostics, path);
+  appendFieldDiagnostics(wrapper, context.diagnostics, path);
   return wrapper;
 }
 
-function renderArrayEditor(schemaModule: Asn1SchemaModule, elementType: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+function renderArrayEditor(context: RenderContext, elementType: Asn1Type, value: unknown, path: FormPathSegment[], label: string): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'asn1ib-form-array';
   const header = document.createElement('div');
   header.className = 'asn1ib-form-array-header';
   header.append(renderFormLegend(label));
+  appendProfileDescription(wrapper, getUiFieldProfile(context.uiProfile, path));
   const addButton = document.createElement('button');
   addButton.type = 'button';
   addButton.textContent = 'Add';
@@ -155,29 +169,32 @@ function renderArrayEditor(schemaModule: Asn1SchemaModule, elementType: Asn1Type
     removeButton.dataset.path = stringifyFormPath(path);
     removeButton.dataset.index = String(index);
     itemHeader.append(itemTitle, removeButton);
-    itemSection.append(itemHeader, renderValueEditor(schemaModule, elementType, item, [...path, index], diagnostics, `Item ${index + 1}`));
+    itemSection.append(itemHeader, renderValueEditor(context, elementType, item, [...path, index], `Item ${index + 1}`));
     wrapper.append(itemSection);
   });
-  appendFieldDiagnostics(wrapper, diagnostics, path);
+  appendFieldDiagnostics(wrapper, context.diagnostics, path);
   return wrapper;
 }
 
-function renderBitStringEditor(value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+function renderBitStringEditor(context: RenderContext, value: unknown, path: FormPathSegment[], label: string): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'asn1ib-form-byte-compound';
   wrapper.append(renderFormLegend(label));
+  appendProfileDescription(wrapper, getUiFieldProfile(context.uiProfile, path));
   const bitStringValue = isPlainObject(value) && 'bytes' in value ? value : { bytes: value ?? { hex: '' }, unusedBits: 0 };
-  wrapper.append(renderByteEditor(bitStringValue.bytes, [...path, 'bytes'], diagnostics, 'Bytes', 'BIT STRING'));
+  wrapper.append(renderByteEditor(context, bitStringValue.bytes, [...path, 'bytes'], 'Bytes', 'BIT STRING'));
   wrapper.append(renderNumberControl(bitStringValue.unusedBits ?? 0, [...path, 'unusedBits'], 'Unused bits', 0, 7));
-  appendFieldDiagnostics(wrapper, diagnostics, path);
+  appendFieldDiagnostics(wrapper, context.diagnostics, path);
   return wrapper;
 }
 
-function renderByteEditor(value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string, typeLabel: string): HTMLElement {
+function renderByteEditor(context: RenderContext, value: unknown, path: FormPathSegment[], label: string, typeLabel: string): HTMLElement {
   const wrapper = document.createElement('section');
   wrapper.className = 'asn1ib-form-byte-editor';
   wrapper.append(renderFormLegend(label));
-  const mode = getByteMode(value);
+  const fieldProfile = getUiFieldProfile(context.uiProfile, path);
+  appendProfileDescription(wrapper, fieldProfile);
+  const mode = getByteMode(value, fieldProfile?.inputMode);
   const content = getByteContent(value, mode);
 
   const modeRow = document.createElement('label');
@@ -203,35 +220,37 @@ function renderByteEditor(value: unknown, path: FormPathSegment[], diagnostics: 
   const input = document.createElement('textarea');
   input.rows = 2;
   input.value = content;
+  if (fieldProfile?.placeholder) input.placeholder = fieldProfile.placeholder;
   input.dataset.path = stringifyFormPath([...path, mode]);
   input.dataset.valueKind = 'string';
   inputRow.append(inputLabel, input);
   wrapper.append(modeRow, inputRow);
-  appendFieldDiagnostics(wrapper, diagnostics, path);
+  appendFieldDiagnostics(wrapper, context.diagnostics, path);
   return wrapper;
 }
 
-function renderPrimitiveEditor(type: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string, schemaModule: Asn1SchemaModule): HTMLElement {
-  if (type.kind === 'boolean') return renderCheckboxControl(value === true, path, label, diagnostics);
+function renderPrimitiveEditor(context: RenderContext, type: Asn1Type, value: unknown, path: FormPathSegment[], label: string): HTMLElement {
+  const fieldProfile = getUiFieldProfile(context.uiProfile, path);
+  if (type.kind === 'boolean') return renderCheckboxControl(value === true, path, label, context.diagnostics, fieldProfile);
   if (type.kind === 'integer') {
-    if (type.values && type.values.length > 0) return renderNamedNumberSelect(type.values, value, path, label, diagnostics);
-    return renderNumberControl(value, path, label);
+    if (type.values && type.values.length > 0) return renderNamedNumberSelect(type.values, value, path, label, context.diagnostics, fieldProfile);
+    return renderNumberControl(value, path, label, undefined, undefined, fieldProfile);
   }
-  if (type.kind === 'enumerated') return renderNamedNumberSelect(type.values, value, path, label, diagnostics);
-  if (type.kind === 'null') return renderNullControl(path, label, diagnostics);
-  const suggestions = type.kind === 'objectIdentifier' ? Object.keys(schemaModule.oidNames ?? {}) : [];
-  return renderTextControl(typeof value === 'string' ? value : '', path, label, type.kind, diagnostics, suggestions);
+  if (type.kind === 'enumerated') return renderNamedNumberSelect(type.values, value, path, label, context.diagnostics, fieldProfile);
+  if (type.kind === 'null') return renderNullControl(path, label, context.diagnostics, fieldProfile);
+  const suggestions = type.kind === 'objectIdentifier' ? Object.keys(context.schemaModule.oidNames ?? {}) : [];
+  return renderTextControl(typeof value === 'string' ? value : '', path, label, type.kind, context.diagnostics, suggestions, fieldProfile);
 }
 
-function renderTextControl(value: string, path: FormPathSegment[], label: string, kind: string, diagnostics: InstanceDiagnostic[], suggestions: string[] = []): HTMLElement {
+function renderTextControl(value: string, path: FormPathSegment[], label: string, kind: string, diagnostics: InstanceDiagnostic[], suggestions: string[] = [], fieldProfile?: UiFieldProfile): HTMLElement {
   const row = document.createElement('label');
   row.className = 'asn1ib-form-control-row';
   const text = document.createElement('span');
   text.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'text';
+  const input = fieldProfile?.widget === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+  if (input instanceof HTMLInputElement) input.type = fieldProfile?.inputMode === 'datetime' ? 'datetime-local' : 'text';
   input.value = value;
-  input.placeholder = kind;
+  input.placeholder = fieldProfile?.placeholder ?? kind;
   input.dataset.path = stringifyFormPath(path);
   input.dataset.valueKind = 'string';
   if (suggestions.length > 0) {
@@ -248,11 +267,12 @@ function renderTextControl(value: string, path: FormPathSegment[], label: string
   } else {
     row.append(text, input);
   }
+  appendProfileDescription(row, fieldProfile);
   appendFieldDiagnostics(row, diagnostics, path);
   return row;
 }
 
-function renderNumberControl(value: unknown, path: FormPathSegment[], label: string, min?: number, max?: number): HTMLElement {
+function renderNumberControl(value: unknown, path: FormPathSegment[], label: string, min?: number, max?: number, fieldProfile?: UiFieldProfile): HTMLElement {
   const row = document.createElement('label');
   row.className = 'asn1ib-form-control-row';
   const text = document.createElement('span');
@@ -263,13 +283,15 @@ function renderNumberControl(value: unknown, path: FormPathSegment[], label: str
   if (min !== undefined) input.min = String(min);
   if (max !== undefined) input.max = String(max);
   input.value = typeof value === 'number' || typeof value === 'string' ? String(value) : '0';
+  if (fieldProfile?.placeholder) input.placeholder = fieldProfile.placeholder;
   input.dataset.path = stringifyFormPath(path);
   input.dataset.valueKind = 'number';
   row.append(text, input);
+  appendProfileDescription(row, fieldProfile);
   return row;
 }
 
-function renderCheckboxControl(value: boolean, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+function renderCheckboxControl(value: boolean, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[], fieldProfile?: UiFieldProfile): HTMLElement {
   const row = document.createElement('label');
   row.className = 'asn1ib-form-checkbox-row';
   const input = document.createElement('input');
@@ -278,11 +300,12 @@ function renderCheckboxControl(value: boolean, path: FormPathSegment[], label: s
   input.dataset.path = stringifyFormPath(path);
   input.dataset.valueKind = 'boolean';
   row.append(input, document.createTextNode(label));
+  appendProfileDescription(row, fieldProfile);
   appendFieldDiagnostics(row, diagnostics, path);
   return row;
 }
 
-function renderNamedNumberSelect(values: Asn1NamedNumber[], value: unknown, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+function renderNamedNumberSelect(values: Asn1NamedNumber[], value: unknown, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[], fieldProfile?: UiFieldProfile): HTMLElement {
   const row = document.createElement('label');
   row.className = 'asn1ib-form-control-row';
   const text = document.createElement('span');
@@ -298,11 +321,12 @@ function renderNamedNumberSelect(values: Asn1NamedNumber[], value: unknown, path
   }
   select.value = typeof value === 'string' ? value : values.find((namedValue) => namedValue.value === value)?.name ?? values[0]?.name ?? '';
   row.append(text, select);
+  appendProfileDescription(row, fieldProfile);
   appendFieldDiagnostics(row, diagnostics, path);
   return row;
 }
 
-function renderNullControl(path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+function renderNullControl(path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[], fieldProfile?: UiFieldProfile): HTMLElement {
   const row = document.createElement('div');
   row.className = 'asn1ib-form-null-row';
   const text = document.createElement('span');
@@ -310,6 +334,7 @@ function renderNullControl(path: FormPathSegment[], label: string, diagnostics: 
   const value = document.createElement('code');
   value.textContent = 'null';
   row.append(text, value);
+  appendProfileDescription(row, fieldProfile);
   appendFieldDiagnostics(row, diagnostics, path);
   return row;
 }
@@ -328,6 +353,33 @@ function renderFormHint(text: string): HTMLElement {
   return hint;
 }
 
+function renderHiddenField(): HTMLElement {
+  const hidden = document.createElement('div');
+  hidden.hidden = true;
+  return hidden;
+}
+
+function renderCollapsedFieldBody(label: string, body: HTMLElement): HTMLElement {
+  const details = document.createElement('details');
+  details.className = 'asn1ib-form-collapsed';
+  const summary = document.createElement('summary');
+  summary.textContent = label;
+  details.append(summary, body);
+  return details;
+}
+
+function appendProfileDescription(container: HTMLElement, fieldProfile: UiFieldProfile | undefined): void {
+  if (!fieldProfile?.description) return;
+  container.append(renderFormHint(fieldProfile.description));
+}
+
+function sortFieldsByProfileOrder(fields: Asn1Field[], path: FormPathSegment[], uiProfile: UiProfile | undefined): Asn1Field[] {
+  return fields
+    .map((field, index) => ({ field, index, order: getUiFieldProfile(uiProfile, [...path, field.name])?.order }))
+    .sort((left, right) => (left.order ?? left.index) - (right.order ?? right.index) || left.index - right.index)
+    .map((item) => item.field);
+}
+
 function appendFieldDiagnostics(container: HTMLElement, diagnostics: InstanceDiagnostic[], path: FormPathSegment[]): void {
   const matching = diagnostics.filter((diagnostic) => pathsMatch(diagnostic.path, path));
   for (const diagnostic of matching) {
@@ -343,11 +395,12 @@ function pathsMatch(diagnosticPath: string[], formPath: FormPathSegment[]): bool
   return diagnosticPath.every((segment, index) => segment === String(formPath[index]));
 }
 
-function getByteMode(value: unknown): 'hex' | 'utf8' | 'base64' {
+function getByteMode(value: unknown, inputMode?: UiProfileInputMode): 'hex' | 'utf8' | 'base64' {
   if (isPlainObject(value)) {
     if (typeof value.utf8 === 'string') return 'utf8';
     if (typeof value.base64 === 'string') return 'base64';
   }
+  if (inputMode === 'utf8' || inputMode === 'base64') return inputMode;
   return 'hex';
 }
 
