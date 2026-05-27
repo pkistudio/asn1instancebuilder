@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, type DefinitionBundle } from '../src/app/definition-bundle';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, type DefinitionBundle } from '../src/app/definition-bundle';
 
 const bundle: DefinitionBundle = {
   id: 'pkistudio.example.person',
@@ -29,6 +29,10 @@ const bundle: DefinitionBundle = {
       id: 'person-alt',
       typeName: 'Person',
       sampleInput: 'Bob'
+    },
+    {
+      typeName: 'Fallback',
+      defaultInput: 'Default value'
     }
   ]
 };
@@ -41,7 +45,11 @@ describe('Definition Bundle helpers', () => {
   });
 
   it('collects entry sample inputs by type name', () => {
-    expect(getDefinitionBundleSampleInputs(bundle)).toEqual({ Person: 'Alice' });
+    expect(getDefinitionBundleSampleInputs(bundle)).toEqual({ Person: 'Alice', Fallback: 'Default value' });
+  });
+
+  it('collects entry UI Profiles by type name', () => {
+    expect(getDefinitionBundleUiProfiles(bundle).Person?.id).toBe('person-profile');
   });
 
   it('narrows raw ASN.1 schema sources', () => {

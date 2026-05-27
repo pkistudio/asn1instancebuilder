@@ -110,8 +110,10 @@ const app = initAsn1InstanceBuilder({ mount: '#app' });
 await app.build(false);
 ```
 
-Hosts can also pass an initial Schema Model and instance input, or call
-`loadSchema(schema)` and `loadInput(input)` on the returned app instance.
+Hosts can also pass an initial Schema Model and instance input, call
+`loadSchema(schema)` and `loadInput(input)`, or load a Definition Bundle with
+`loadBundle(bundle, entryIdOrTypeName?)` on the returned app instance. The app
+entry also exports the `DefinitionBundle` and `UiProfile` TypeScript types.
 
 For mounting, app instance methods, host boundaries, and viewer routing, see
 [Embedding](https://github.com/pkistudio/asn1instancebuilder/wiki/Embedding).

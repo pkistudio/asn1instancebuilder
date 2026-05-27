@@ -1,7 +1,8 @@
 import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, isRawAsn1BundleSchemaSource, type DefinitionBundle } from './definition-bundle.js';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, type DefinitionBundle } from './definition-bundle.js';
 import { createDefaultInput, findChoiceAlternative, getValueAtPath, parseFormPath, removeValueAtPath, setFormControlValue, setValueAtPath, type JsonObject } from './form-model.js';
 import { readFormControlValue, renderInputForm, updateInputModeButtons, type InputMode } from './form-renderer.js';
+import type { UiProfile } from './ui-profile.js';
 import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
 import defaultsAndEnumeratedDefinition from '../../fixtures/defaults-and-enumerated.asn1?raw';
 import minimalCrlDefinition from '../../fixtures/minimal-crl.asn1?raw';
@@ -37,6 +38,7 @@ export interface Asn1InstanceBuilderAppOptions {
 
 export interface Asn1InstanceBuilderApp {
   build(openViewerWindow?: boolean): Promise<void>;
+  loadBundle(bundle: DefinitionBundle, entryIdOrTypeName?: string): void;
   loadSchema(schema: Asn1SchemaModule): void;
   loadInput(input: unknown): void;
 }
@@ -58,6 +60,7 @@ type NamedObjectBundle = DefinitionBundle & {
 };
 
 type SampleInputMap = Record<string, unknown>;
+type UiProfileMap = Record<string, UiProfile>;
 
 function parseFixtureJson<T = unknown>(source: string): T {
   return JSON.parse(source) as T;
@@ -199,6 +202,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   let currentInstanceDiagnostics: InstanceDiagnostic[] = [];
   let inputFormError: string | undefined;
   let activeSampleInputs: SampleInputMap | undefined;
+  let activeUiProfiles: UiProfileMap | undefined;
   const apiLogEntries: ApiLogEntry[] = [];
 
   initializeWorkspaceResizer(mount, workspace, workspaceResizer);
@@ -249,7 +253,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       const activeInput = input !== undefined ? input : createDefaultInputForSelectedType();
       input = activeInput;
       inputText.value = JSON.stringify(activeInput, null, 2);
-      renderInputForm(inputForm, schema, resolveDefinedType(schema, typeName), activeInput, currentInstanceDiagnostics);
+      renderInputForm(inputForm, schema, resolveDefinedType(schema, typeName), activeInput, currentInstanceDiagnostics, activeUiProfiles?.[typeName]);
     } catch (error) {
       inputForm.innerHTML = '';
       const message = document.createElement('div');
@@ -280,6 +284,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     currentInstanceDiagnostics = [];
     inputFormError = undefined;
     activeSampleInputs = undefined;
+    activeUiProfiles = undefined;
     definitionText.value = '';
     inputText.value = '';
     typeSelect.innerHTML = '';
@@ -342,6 +347,45 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     return true;
   };
 
+  const loadSchemaModel = (nextSchema: Asn1SchemaModule, source: string, preferredTypeName?: string): boolean => {
+    if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
+    schema = nextSchema;
+    definitionText.value = JSON.stringify(nextSchema, null, 2);
+    refreshTypeSelect(preferredTypeName);
+    const schemaDiagnostics = validateSchemaModule(schema);
+    renderDiagnostics(diagnosticsList, [{ title: 'Schema', diagnostics: schemaDiagnostics }]);
+    definitionStatus.textContent = schemaDiagnostics.length > 0 ? `Loaded from ${source}. Definition diagnostics: ${formatDiagnosticSummary(schemaDiagnostics)}` : `Loaded ${schema.types.length} ASN.1 type${schema.types.length === 1 ? '' : 's'} from ${source}.`;
+    buildStatus.textContent = 'Definition loaded. Build DER to update the generated output.';
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
+    updateDefinitionActionState();
+    renderActiveInputEditor();
+    appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'loadSchema', detail: `${source}: ${formatDiagnosticSummary(schemaDiagnostics)}` });
+    return !hasDiagnosticErrors(schemaDiagnostics);
+  };
+
+  const loadDefinitionBundle = (bundle: DefinitionBundle, entryIdOrTypeName: string | undefined, sourcePrefix: string): void => {
+    const entry = entryIdOrTypeName ? findDefinitionBundleEntry(bundle, entryIdOrTypeName) : bundle.entries[0];
+    if (!entry) {
+      throw new Error(entryIdOrTypeName ? `Definition Bundle ${bundle.id} does not contain entry ${entryIdOrTypeName}.` : `Definition Bundle ${bundle.id} does not contain any entries.`);
+    }
+    const sourceName = isRawAsn1BundleSchemaSource(bundle.schema) ? bundle.schema.sourceName ?? bundle.id : bundle.id;
+    const source = `${sourcePrefix}: ${bundle.label} (${sourceName})`;
+    const loaded = isRawAsn1BundleSchemaSource(bundle.schema)
+      ? loadDefinitionText(bundle.schema.source, source, entry.typeName)
+      : loadSchemaModel(bundle.schema.schema, source, entry.typeName);
+    if (!loaded) return;
+    activeSampleInputs = getDefinitionBundleSampleInputs(bundle);
+    activeUiProfiles = getDefinitionBundleUiProfiles(bundle);
+    if (!loadSampleInputForType(entry.typeName)) {
+      input = 'defaultInput' in entry ? entry.defaultInput : createDefaultInputForSelectedType();
+      inputText.value = JSON.stringify(input, null, 2);
+      renderActiveInputEditor();
+      updateDefinitionActionState();
+    }
+    appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'loadBundle', detail: `${bundle.id}: loaded ${entry.typeName}.` });
+  };
+
   const app: Asn1InstanceBuilderApp = {
     async build(openViewerWindow = true) {
       let handledDiagnosticError = false;
@@ -397,9 +441,13 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         }
       }
     },
+    loadBundle(bundle, entryIdOrTypeName) {
+      loadDefinitionBundle(bundle, entryIdOrTypeName, 'DefinitionBundle');
+    },
     loadSchema(nextSchema) {
       schema = nextSchema;
       activeSampleInputs = undefined;
+      activeUiProfiles = undefined;
       definitionText.value = JSON.stringify(schema, null, 2);
       refreshTypeSelect();
       currentInstanceDiagnostics = [];
@@ -528,16 +576,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   for (const button of namedObjectButtons) {
     button.addEventListener('click', () => {
       const namedObject = namedObjectBundles.find((bundle) => bundle.id === button.dataset.objectId);
-      if (!namedObject || !isRawAsn1BundleSchemaSource(namedObject.schema)) return;
-      const primaryEntry = findDefinitionBundleEntry(namedObject, namedObject.id);
-      const typeName = primaryEntry?.typeName ?? namedObject.entries[0]?.typeName;
-      if (!typeName) return;
-      const sourceName = namedObject.schema.sourceName ?? namedObject.id;
-      const loaded = loadDefinitionText(namedObject.schema.source, `NamedObjects: ${namedObject.label} (${sourceName})`, typeName);
-      if (loaded) {
-        activeSampleInputs = getDefinitionBundleSampleInputs(namedObject);
-        loadSampleInputForType(typeName);
-      }
+      if (!namedObject) return;
+      loadDefinitionBundle(namedObject, namedObject.id, 'NamedObjects');
       closeMenuAfterSelection(button, definitionText);
     });
   }
