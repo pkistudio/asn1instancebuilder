@@ -17,18 +17,32 @@ export type UiProfileWidget =
   | 'dateTime';
 
 export interface UiFieldProfile {
+  /** Display label for the generated form field. */
   label?: string;
+  /** Short help text shown near the generated form field or group. */
   description?: string;
+  /** Preferred widget for the field when the renderer supports it. */
   widget?: UiProfileWidget;
   placeholder?: string;
+  /** UI hint for form initialization only; DER generation uses Instance JSON. */
   defaultInput?: unknown;
+  /** Hide the field from the generated form while keeping JSON editing available. */
   hidden?: boolean;
+  /** Render a constructed field group collapsed by default when supported. */
   collapsed?: boolean;
+  /** Sort key for fields within the same constructed parent. */
   order?: number;
+  /** Preferred text encoding or semantic input mode for compatible widgets. */
   inputMode?: UiProfileInputMode;
 }
 
-/** Internal input-experience metadata for one top-level ASN.1 type. */
+/**
+ * Optional input-experience metadata for one top-level ASN.1 type.
+ *
+ * UI Profiles decorate generated forms but do not change schema validation,
+ * instance validation, or DER generation. Field keys use normalized form paths,
+ * such as "subject.name" or "extensions.0.extnValue".
+ */
 export interface UiProfile {
   id: string;
   typeName: string;

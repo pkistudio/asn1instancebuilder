@@ -184,6 +184,15 @@ UI Profiles only describe the input experience. Schema diagnostics, instance
 diagnostics, and DER generation continue to use the Schema Model and Instance
 JSON as the source of truth.
 
+The `DefinitionBundle` and `UiProfile` types are host-facing app API contracts
+for `@pkistudio/asn1instancebuilder/app`. In the 0.x series they may gain
+additional optional fields, but existing fields are intended to remain
+compatible. Bundle `version` describes the bundle payload format, not the npm
+package version. Unknown bundle or profile fields are ignored by the current app
+helpers so hosts can attach private metadata. When both `sampleInput` and
+`defaultInput` are present for an entry type, `sampleInput` is loaded first;
+`defaultInput` is the fallback starting value.
+
 See `fixtures/person.definition-bundle.json` for a complete raw ASN.1 bundle
 example.
 

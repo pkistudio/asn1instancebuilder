@@ -72,8 +72,11 @@ Suggested rollout order:
 6. Add a host or browser-app path for loading Definition Bundles.
 7. Revisit whether stable bundle/profile shapes should become public exports or move to a shared PkiStudio definitions package.
 
+As of v0.1.5, Definition Bundle and UI Profile types are host-facing app package exports from `@pkistudio/asn1instancebuilder/app`. They should stay app-entry contracts while the shapes mature; moving them into Core API or a shared PkiStudio definitions package remains a future decision.
+
 ## Related
 
 - Issue #16: Plan Definition Bundles and UI Profiles for reusable form generation.
+- Issue #30: Stabilize Definition Bundle and UI Profile public contract.
 - Issue #13: Add schema-driven hybrid form editing for instance input.
 - PR #14: Add hybrid form instance input editor.
