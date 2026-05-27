@@ -41,9 +41,21 @@ export function getDefinitionBundleSampleInputs(bundle: DefinitionBundle): Recor
   for (const entry of bundle.entries) {
     if ('sampleInput' in entry && !Object.prototype.hasOwnProperty.call(sampleInputs, entry.typeName)) {
       sampleInputs[entry.typeName] = entry.sampleInput;
+    } else if ('defaultInput' in entry && !Object.prototype.hasOwnProperty.call(sampleInputs, entry.typeName)) {
+      sampleInputs[entry.typeName] = entry.defaultInput;
     }
   }
   return sampleInputs;
+}
+
+export function getDefinitionBundleUiProfiles(bundle: DefinitionBundle): Record<string, UiProfile> {
+  const uiProfiles: Record<string, UiProfile> = {};
+  for (const entry of bundle.entries) {
+    if (entry.uiProfile && !Object.prototype.hasOwnProperty.call(uiProfiles, entry.typeName)) {
+      uiProfiles[entry.typeName] = entry.uiProfile;
+    }
+  }
+  return uiProfiles;
 }
 
 export function isRawAsn1BundleSchemaSource(source: DefinitionBundleSchemaSource): source is Extract<DefinitionBundleSchemaSource, { format: 'asn1' }> {
