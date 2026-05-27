@@ -1,4 +1,4 @@
-import { createInstance, parseAsn1Definition, parseGeneratedDer, validateInstance, validateSchemaModule, type Asn1SchemaModule, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
+import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1Field, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
 import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
 import defaultsAndEnumeratedDefinition from '../../fixtures/defaults-and-enumerated.asn1?raw';
 import minimalCrlDefinition from '../../fixtures/minimal-crl.asn1?raw';
@@ -52,6 +52,7 @@ interface NamedObjectDefinition {
 
 type JsonObject = Record<string, unknown>;
 type SampleInputMap = Record<string, unknown>;
+type InputMode = 'form' | 'json';
 
 function parseFixtureJson<T = unknown>(source: string): T {
   return JSON.parse(source) as T;
@@ -145,6 +146,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const definitionText = mustFind<HTMLTextAreaElement>(mount, '[data-role="definition"]');
   const definitionFileInput = mustFind<HTMLInputElement>(mount, '[data-role="definition-file"]');
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
+  const inputForm = mustFind<HTMLElement>(mount, '[data-role="input-form"]');
+  const inputModeButtons = Array.from(mount.querySelectorAll<HTMLButtonElement>('[data-role="input-mode"]'));
   const typeSelect = mustFind<HTMLSelectElement>(mount, '[data-role="type"]');
   const diagnosticsList = mustFind<HTMLElement>(mount, '[data-role="diagnostics"]');
   const workspace = mustFind<HTMLElement>(mount, '[data-role="workspace"]');
@@ -168,6 +171,9 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
   let schema = emptySchema;
   let input: unknown;
+  let inputMode: InputMode = 'json';
+  let currentInstanceDiagnostics: InstanceDiagnostic[] = [];
+  let inputFormError: string | undefined;
   let activeSampleInputs: SampleInputMap | undefined;
   const apiLogEntries: ApiLogEntry[] = [];
 
@@ -182,9 +188,73 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     buildButton.disabled = !hasDefinition || !hasInput || typeSelect.options.length === 0;
   };
 
+  const setInputValue = (nextInput: unknown): void => {
+    input = nextInput;
+    inputText.value = JSON.stringify(nextInput, null, 2);
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
+    renderActiveInputEditor();
+    updateDefinitionActionState();
+  };
+
+  const createDefaultInputForSelectedType = (): unknown => {
+    const typeName = typeSelect.value || schema.types[0]?.name;
+    if (!typeName) return {};
+    return createDefaultInput(schema, resolveDefinedType(schema, typeName));
+  };
+
+  const renderActiveInputEditor = (): void => {
+    updateInputModeButtons(inputModeButtons, inputMode);
+    inputText.hidden = inputMode !== 'json';
+    inputForm.hidden = inputMode !== 'form';
+    if (inputMode !== 'form') return;
+    if (inputFormError) {
+      inputForm.innerHTML = '';
+      const message = document.createElement('div');
+      message.className = 'asn1ib-form-empty asn1ib-form-error';
+      message.textContent = inputFormError;
+      inputForm.append(message);
+      return;
+    }
+    const typeName = typeSelect.value || schema.types[0]?.name;
+    if (!typeName) {
+      inputForm.innerHTML = '<div class="asn1ib-form-empty">Load an ASN.1 definition and select a type.</div>';
+      return;
+    }
+    try {
+      const activeInput = input !== undefined ? input : createDefaultInputForSelectedType();
+      input = activeInput;
+      inputText.value = JSON.stringify(activeInput, null, 2);
+      renderInputForm(inputForm, schema, resolveDefinedType(schema, typeName), activeInput, currentInstanceDiagnostics);
+    } catch (error) {
+      inputForm.innerHTML = '';
+      const message = document.createElement('div');
+      message.className = 'asn1ib-form-empty asn1ib-form-error';
+      message.textContent = error instanceof Error ? error.message : String(error);
+      inputForm.append(message);
+    }
+  };
+
+  const setInputMode = (nextMode: InputMode): void => {
+    inputMode = nextMode;
+    if (nextMode === 'form') {
+      try {
+        input = inputText.value.trim().length > 0 ? JSON.parse(inputText.value) as unknown : createDefaultInputForSelectedType();
+        inputText.value = JSON.stringify(input, null, 2);
+        inputFormError = undefined;
+      } catch (error) {
+        inputFormError = `JSON input could not be loaded into the form: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    renderActiveInputEditor();
+    updateDefinitionActionState();
+  };
+
   const clearDefinitionWorkspace = () => {
     schema = emptySchema;
     input = undefined;
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
     activeSampleInputs = undefined;
     definitionText.value = '';
     inputText.value = '';
@@ -193,6 +263,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     definitionStatus.textContent = 'Definition input is ready.';
     buildStatus.textContent = 'Build status is ready.';
     updateDefinitionActionState();
+    renderActiveInputEditor();
   };
 
   const loadDefinitionText = (text: string, source: string, preferredTypeName?: string): boolean => {
@@ -206,6 +277,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       definitionStatus.textContent = schemaDiagnostics.length > 0 ? `Loaded from ${source}. Definition diagnostics: ${formatDiagnosticSummary(schemaDiagnostics)}` : `Loaded ${schema.types.length} ASN.1 type${schema.types.length === 1 ? '' : 's'} from ${source}.`;
       buildStatus.textContent = 'Definition loaded. Build DER to update the generated output.';
       updateDefinitionActionState();
+      renderActiveInputEditor();
       appendApiLog(apiLog, apiLogEntries, { level: schemaDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : schemaDiagnostics.length > 0 ? 'warning' : 'success', label: 'loadDefinition', detail: `${source}: ${formatDiagnosticSummary(schemaDiagnostics)}` });
       return true;
     } catch (error) {
@@ -237,8 +309,11 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     const sampleInput = activeSampleInputs[typeName];
     input = sampleInput;
     inputText.value = JSON.stringify(sampleInput, null, 2);
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
     buildStatus.textContent = `Loaded ${typeName} sample input. Build DER to update the generated output.`;
     updateDefinitionActionState();
+    renderActiveInputEditor();
     appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'loadSampleInput', detail: `${typeName}: loaded sample input.` });
     return true;
   };
@@ -268,6 +343,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
         const typeName = typeSelect.value || schema.types[0]?.name;
         if (!typeName) throw new Error('The schema does not define any ASN.1 types.');
         const instanceDiagnostics = validateInstance(schema, typeName, input);
+        currentInstanceDiagnostics = instanceDiagnostics;
+        renderActiveInputEditor();
         appendApiLog(apiLog, apiLogEntries, { level: instanceDiagnostics.some((diagnostic) => diagnostic.severity === 'error') ? 'error' : instanceDiagnostics.length > 0 ? 'warning' : 'success', label: 'validateInstance', detail: `${typeName}: ${formatDiagnosticSummary(instanceDiagnostics)}` });
         renderDiagnostics(diagnosticsList, [
           { title: 'Schema', diagnostics: schemaDiagnostics },
@@ -301,12 +378,13 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       activeSampleInputs = undefined;
       definitionText.value = JSON.stringify(schema, null, 2);
       refreshTypeSelect();
+      currentInstanceDiagnostics = [];
+      inputFormError = undefined;
+      renderActiveInputEditor();
       updateDefinitionActionState();
     },
     loadInput(nextInput) {
-      input = nextInput;
-      inputText.value = JSON.stringify(input, null, 2);
-      updateDefinitionActionState();
+      setInputValue(nextInput);
     }
   };
 
@@ -315,9 +393,98 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     renderApiLog(apiLog, apiLogEntries);
   });
   closeDefinitionButton.addEventListener('click', clearDefinitionWorkspace);
-  inputText.addEventListener('input', updateDefinitionActionState);
+  inputText.addEventListener('input', () => {
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
+    updateDefinitionActionState();
+  });
+  for (const button of inputModeButtons) {
+    button.addEventListener('click', () => setInputMode(button.dataset.mode === 'form' ? 'form' : 'json'));
+  }
+  inputForm.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement) && !(target instanceof HTMLSelectElement)) return;
+    if (!target.dataset.path || !target.dataset.valueKind) return;
+    const path = parseFormPath(target.dataset.path);
+    input = setFormControlValue(input, path, readControlValue(target));
+    inputText.value = JSON.stringify(input, null, 2);
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
+    updateDefinitionActionState();
+  });
+  inputForm.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+    if (target instanceof HTMLInputElement && target.dataset.action === 'toggle-field' && target.dataset.path && target.dataset.fieldType) {
+      const path = parseFormPath(target.dataset.path);
+      input = target.checked ? setValueAtPath(input, path, createDefaultInput(schema, JSON.parse(target.dataset.fieldType) as Asn1Type)) : removeValueAtPath(input, path);
+      inputText.value = JSON.stringify(input, null, 2);
+      currentInstanceDiagnostics = [];
+      inputFormError = undefined;
+      renderActiveInputEditor();
+      updateDefinitionActionState();
+      return;
+    }
+    if (target.dataset.action === 'choice-selected' && target.dataset.path && target.dataset.choiceType) {
+      const path = parseFormPath(target.dataset.path);
+      const choice = findChoiceAlternative(schema, JSON.parse(target.dataset.choiceType) as Asn1Type, target.value);
+      if (!choice) return;
+      input = setValueAtPath(input, path, { selected: target.value, value: createDefaultInput(schema, choice.type) });
+      inputText.value = JSON.stringify(input, null, 2);
+      currentInstanceDiagnostics = [];
+      inputFormError = undefined;
+      renderActiveInputEditor();
+      updateDefinitionActionState();
+      return;
+    }
+    if (target.dataset.action === 'byte-mode' && target.dataset.path) {
+      const path = parseFormPath(target.dataset.path);
+      input = setValueAtPath(input, path, { [target.value]: '' });
+      inputText.value = JSON.stringify(input, null, 2);
+      currentInstanceDiagnostics = [];
+      inputFormError = undefined;
+      renderActiveInputEditor();
+      updateDefinitionActionState();
+      return;
+    }
+    if (target.dataset.path && target.dataset.valueKind) {
+      const path = parseFormPath(target.dataset.path);
+      input = setFormControlValue(input, path, readControlValue(target));
+      inputText.value = JSON.stringify(input, null, 2);
+      currentInstanceDiagnostics = [];
+      inputFormError = undefined;
+      updateDefinitionActionState();
+    }
+  });
+  inputForm.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-action]') : null;
+    if (!button || !button.dataset.path) return;
+    const path = parseFormPath(button.dataset.path);
+    if (button.dataset.action === 'add-item' && button.dataset.itemType) {
+      const current = getValueAtPath(input, path);
+      const nextItems = Array.isArray(current) ? [...current] : [];
+      nextItems.push(createDefaultInput(schema, JSON.parse(button.dataset.itemType) as Asn1Type));
+      input = setValueAtPath(input, path, nextItems);
+    } else if (button.dataset.action === 'remove-item' && button.dataset.index) {
+      const current = getValueAtPath(input, path);
+      if (!Array.isArray(current)) return;
+      const nextItems = current.filter((_, index) => index !== Number.parseInt(button.dataset.index ?? '', 10));
+      input = setValueAtPath(input, path, nextItems);
+    } else {
+      return;
+    }
+    inputText.value = JSON.stringify(input, null, 2);
+    currentInstanceDiagnostics = [];
+    inputFormError = undefined;
+    renderActiveInputEditor();
+    updateDefinitionActionState();
+  });
   typeSelect.addEventListener('change', () => {
-    loadSampleInputForType(typeSelect.value);
+    if (!loadSampleInputForType(typeSelect.value) && inputMode === 'form') {
+      setInputValue(createDefaultInputForSelectedType());
+    } else {
+      renderActiveInputEditor();
+    }
   });
   loadDefinitionFileButton.addEventListener('click', () => definitionFileInput.click());
   loadDefinitionClipboardButton.addEventListener('click', async () => {
@@ -370,6 +537,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   if (options.schema) app.loadSchema(options.schema);
   if (options.input !== undefined) app.loadInput(options.input);
   updateDefinitionActionState();
+  renderActiveInputEditor();
   return app;
 }
 
@@ -418,7 +586,12 @@ function renderShell(): string {
           </div>
           <div class="asn1ib-instance-controls">
             <select data-role="type" aria-label="ASN.1 type"></select>
+            <div class="asn1ib-input-mode-tabs" role="tablist" aria-label="Instance input mode">
+              <button type="button" data-role="input-mode" data-mode="form" role="tab">Form</button>
+              <button type="button" data-role="input-mode" data-mode="json" role="tab">JSON</button>
+            </div>
           </div>
+          <div data-role="input-form" class="asn1ib-input-form" hidden></div>
           <textarea data-role="input" spellcheck="false"></textarea>
         </section>
         <div data-role="diagnostics-resizer" class="asn1ib-pane-resizer" role="separator" aria-label="Resize diagnostics pane" aria-orientation="horizontal" tabindex="0"></div>
@@ -457,6 +630,476 @@ function renderShell(): string {
 
 function renderNamedObjectMenuItems(): string {
   return namedObjectDefinitions.map((definition) => `<button type="button" role="menuitem" data-role="load-named-object" data-object-id="${definition.id}">${definition.label}</button>`).join('');
+}
+
+type FormPathSegment = string | number;
+
+function updateInputModeButtons(buttons: HTMLButtonElement[], mode: InputMode): void {
+  for (const button of buttons) {
+    const selected = button.dataset.mode === mode;
+    button.classList.toggle('is-active', selected);
+    button.setAttribute('aria-selected', String(selected));
+  }
+}
+
+function renderInputForm(container: HTMLElement, schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, diagnostics: InstanceDiagnostic[]): void {
+  container.innerHTML = '';
+  container.append(renderValueEditor(schemaModule, type, value, [], diagnostics, 'Value'));
+}
+
+function renderValueEditor(schemaModule: Asn1SchemaModule, type: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+  const resolved = resolveEditableType(schemaModule, type);
+  switch (resolved.kind) {
+    case 'sequence':
+    case 'set':
+      return renderFieldGroup(schemaModule, resolved.fields, value, path, diagnostics, label);
+    case 'choice':
+      return renderChoiceEditor(schemaModule, resolved, value, path, diagnostics, label);
+    case 'sequenceOf':
+    case 'setOf':
+      return renderArrayEditor(schemaModule, resolved.elementType, value, path, diagnostics, label);
+    case 'bitString':
+      return renderBitStringEditor(value, path, diagnostics, label);
+    case 'octetString':
+      return renderByteEditor(value, path, diagnostics, label, 'OCTET STRING');
+    default:
+      return renderPrimitiveEditor(resolved, value, path, diagnostics, label, schemaModule);
+  }
+}
+
+function renderFieldGroup(schemaModule: Asn1SchemaModule, fields: Asn1Field[], value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+  const group = document.createElement('section');
+  group.className = 'asn1ib-form-group';
+  group.append(renderFormLegend(label));
+  const objectValue = isPlainObject(value) ? value : {};
+
+  for (const field of fields) {
+    const fieldPath = [...path, field.name];
+    const hasValue = Object.prototype.hasOwnProperty.call(objectValue, field.name);
+    const row = document.createElement('section');
+    row.className = 'asn1ib-form-field';
+
+    const header = document.createElement('div');
+    header.className = 'asn1ib-form-field-header';
+    const title = document.createElement('span');
+    title.textContent = field.name;
+    header.append(title);
+
+    if (field.optional || 'defaultValue' in field) {
+      const toggleLabel = document.createElement('label');
+      toggleLabel.className = 'asn1ib-form-toggle';
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = hasValue;
+      toggle.dataset.action = 'toggle-field';
+      toggle.dataset.path = stringifyFormPath(fieldPath);
+      toggle.dataset.fieldType = JSON.stringify(field.type);
+      toggleLabel.append(toggle, document.createTextNode('Set'));
+      header.append(toggleLabel);
+    }
+    row.append(header);
+
+    if (hasValue || (!field.optional && !('defaultValue' in field))) {
+      row.append(renderValueEditor(schemaModule, field.type, objectValue[field.name], fieldPath, diagnostics, field.name));
+    } else if ('defaultValue' in field) {
+      row.append(renderFormHint('Using ASN.1 DEFAULT value.'));
+    } else {
+      row.append(renderFormHint('Optional field omitted.'));
+    }
+    appendFieldDiagnostics(row, diagnostics, fieldPath);
+    group.append(row);
+  }
+
+  appendFieldDiagnostics(group, diagnostics, path);
+  return group;
+}
+
+function renderChoiceEditor(schemaModule: Asn1SchemaModule, type: Extract<Asn1Type, { kind: 'choice' }>, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+  const wrapper = document.createElement('section');
+  wrapper.className = 'asn1ib-form-choice';
+  wrapper.append(renderFormLegend(label));
+  const choiceValue = isPlainObject(value) ? value : { selected: type.alternatives[0]?.name, value: undefined };
+  const selectedName = typeof choiceValue.selected === 'string' ? choiceValue.selected : type.alternatives[0]?.name ?? '';
+  const selected = type.alternatives.find((alternative) => alternative.name === selectedName) ?? type.alternatives[0];
+
+  const selectRow = document.createElement('label');
+  selectRow.className = 'asn1ib-form-control-row';
+  const selectLabel = document.createElement('span');
+  selectLabel.textContent = 'Alternative';
+  const select = document.createElement('select');
+  select.dataset.action = 'choice-selected';
+  select.dataset.path = stringifyFormPath(path);
+  select.dataset.choiceType = JSON.stringify(type);
+  for (const alternative of type.alternatives) {
+    const option = document.createElement('option');
+    option.value = alternative.name;
+    option.textContent = alternative.name;
+    select.append(option);
+  }
+  select.value = selected?.name ?? '';
+  selectRow.append(selectLabel, select);
+  wrapper.append(selectRow);
+
+  if (selected) {
+    const nestedValue = selectedName === choiceValue.selected && 'value' in choiceValue ? choiceValue.value : createDefaultInput(schemaModule, selected.type);
+    wrapper.append(renderValueEditor(schemaModule, selected.type, nestedValue, [...path, 'value'], diagnostics, selected.name));
+  }
+  appendFieldDiagnostics(wrapper, diagnostics, path);
+  return wrapper;
+}
+
+function renderArrayEditor(schemaModule: Asn1SchemaModule, elementType: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+  const wrapper = document.createElement('section');
+  wrapper.className = 'asn1ib-form-array';
+  const header = document.createElement('div');
+  header.className = 'asn1ib-form-array-header';
+  header.append(renderFormLegend(label));
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.textContent = 'Add';
+  addButton.dataset.action = 'add-item';
+  addButton.dataset.path = stringifyFormPath(path);
+  addButton.dataset.itemType = JSON.stringify(elementType);
+  header.append(addButton);
+  wrapper.append(header);
+
+  const items = Array.isArray(value) ? value : [];
+  if (items.length === 0) wrapper.append(renderFormHint('No items.'));
+  items.forEach((item, index) => {
+    const itemSection = document.createElement('section');
+    itemSection.className = 'asn1ib-form-array-item';
+    const itemHeader = document.createElement('div');
+    itemHeader.className = 'asn1ib-form-array-item-header';
+    const itemTitle = document.createElement('span');
+    itemTitle.textContent = `Item ${index + 1}`;
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.textContent = 'Remove';
+    removeButton.dataset.action = 'remove-item';
+    removeButton.dataset.path = stringifyFormPath(path);
+    removeButton.dataset.index = String(index);
+    itemHeader.append(itemTitle, removeButton);
+    itemSection.append(itemHeader, renderValueEditor(schemaModule, elementType, item, [...path, index], diagnostics, `Item ${index + 1}`));
+    wrapper.append(itemSection);
+  });
+  appendFieldDiagnostics(wrapper, diagnostics, path);
+  return wrapper;
+}
+
+function renderBitStringEditor(value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string): HTMLElement {
+  const wrapper = document.createElement('section');
+  wrapper.className = 'asn1ib-form-byte-compound';
+  wrapper.append(renderFormLegend(label));
+  const bitStringValue = isPlainObject(value) && 'bytes' in value ? value : { bytes: value ?? { hex: '' }, unusedBits: 0 };
+  wrapper.append(renderByteEditor(bitStringValue.bytes, [...path, 'bytes'], diagnostics, 'Bytes', 'BIT STRING'));
+  wrapper.append(renderNumberControl(bitStringValue.unusedBits ?? 0, [...path, 'unusedBits'], 'Unused bits', 0, 7));
+  appendFieldDiagnostics(wrapper, diagnostics, path);
+  return wrapper;
+}
+
+function renderByteEditor(value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string, typeLabel: string): HTMLElement {
+  const wrapper = document.createElement('section');
+  wrapper.className = 'asn1ib-form-byte-editor';
+  wrapper.append(renderFormLegend(label));
+  const mode = getByteMode(value);
+  const content = getByteContent(value, mode);
+
+  const modeRow = document.createElement('label');
+  modeRow.className = 'asn1ib-form-control-row';
+  const modeLabel = document.createElement('span');
+  modeLabel.textContent = `${typeLabel} mode`;
+  const select = document.createElement('select');
+  select.dataset.action = 'byte-mode';
+  select.dataset.path = stringifyFormPath(path);
+  for (const optionValue of ['hex', 'utf8', 'base64']) {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    select.append(option);
+  }
+  select.value = mode;
+  modeRow.append(modeLabel, select);
+
+  const inputRow = document.createElement('label');
+  inputRow.className = 'asn1ib-form-control-row';
+  const inputLabel = document.createElement('span');
+  inputLabel.textContent = mode;
+  const input = document.createElement('textarea');
+  input.rows = 2;
+  input.value = content;
+  input.dataset.path = stringifyFormPath([...path, mode]);
+  input.dataset.valueKind = 'string';
+  inputRow.append(inputLabel, input);
+  wrapper.append(modeRow, inputRow);
+  appendFieldDiagnostics(wrapper, diagnostics, path);
+  return wrapper;
+}
+
+function renderPrimitiveEditor(type: Asn1Type, value: unknown, path: FormPathSegment[], diagnostics: InstanceDiagnostic[], label: string, schemaModule: Asn1SchemaModule): HTMLElement {
+  if (type.kind === 'boolean') return renderCheckboxControl(value === true, path, label, diagnostics);
+  if (type.kind === 'integer') {
+    if (type.values && type.values.length > 0) return renderNamedNumberSelect(type.values, value, path, label, diagnostics);
+    return renderNumberControl(value, path, label);
+  }
+  if (type.kind === 'enumerated') return renderNamedNumberSelect(type.values, value, path, label, diagnostics);
+  if (type.kind === 'null') return renderNullControl(path, label, diagnostics);
+  const suggestions = type.kind === 'objectIdentifier' ? Object.keys(schemaModule.oidNames ?? {}) : [];
+  return renderTextControl(typeof value === 'string' ? value : '', path, label, type.kind, diagnostics, suggestions);
+}
+
+function renderTextControl(value: string, path: FormPathSegment[], label: string, kind: string, diagnostics: InstanceDiagnostic[], suggestions: string[] = []): HTMLElement {
+  const row = document.createElement('label');
+  row.className = 'asn1ib-form-control-row';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = value;
+  input.placeholder = kind;
+  input.dataset.path = stringifyFormPath(path);
+  input.dataset.valueKind = 'string';
+  if (suggestions.length > 0) {
+    const listId = `asn1ib-oid-${Math.random().toString(16).slice(2)}`;
+    input.setAttribute('list', listId);
+    const list = document.createElement('datalist');
+    list.id = listId;
+    for (const suggestion of suggestions) {
+      const option = document.createElement('option');
+      option.value = suggestion;
+      list.append(option);
+    }
+    row.append(text, input, list);
+  } else {
+    row.append(text, input);
+  }
+  appendFieldDiagnostics(row, diagnostics, path);
+  return row;
+}
+
+function renderNumberControl(value: unknown, path: FormPathSegment[], label: string, min?: number, max?: number): HTMLElement {
+  const row = document.createElement('label');
+  row.className = 'asn1ib-form-control-row';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '1';
+  if (min !== undefined) input.min = String(min);
+  if (max !== undefined) input.max = String(max);
+  input.value = typeof value === 'number' || typeof value === 'string' ? String(value) : '0';
+  input.dataset.path = stringifyFormPath(path);
+  input.dataset.valueKind = 'number';
+  row.append(text, input);
+  return row;
+}
+
+function renderCheckboxControl(value: boolean, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+  const row = document.createElement('label');
+  row.className = 'asn1ib-form-checkbox-row';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = value;
+  input.dataset.path = stringifyFormPath(path);
+  input.dataset.valueKind = 'boolean';
+  row.append(input, document.createTextNode(label));
+  appendFieldDiagnostics(row, diagnostics, path);
+  return row;
+}
+
+function renderNamedNumberSelect(values: { name: string; value: number }[], value: unknown, path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+  const row = document.createElement('label');
+  row.className = 'asn1ib-form-control-row';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const select = document.createElement('select');
+  select.dataset.path = stringifyFormPath(path);
+  select.dataset.valueKind = 'string';
+  for (const namedValue of values) {
+    const option = document.createElement('option');
+    option.value = namedValue.name;
+    option.textContent = `${namedValue.name} (${namedValue.value})`;
+    select.append(option);
+  }
+  select.value = typeof value === 'string' ? value : values.find((namedValue) => namedValue.value === value)?.name ?? values[0]?.name ?? '';
+  row.append(text, select);
+  appendFieldDiagnostics(row, diagnostics, path);
+  return row;
+}
+
+function renderNullControl(path: FormPathSegment[], label: string, diagnostics: InstanceDiagnostic[]): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'asn1ib-form-null-row';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const value = document.createElement('code');
+  value.textContent = 'null';
+  row.append(text, value);
+  appendFieldDiagnostics(row, diagnostics, path);
+  return row;
+}
+
+function renderFormLegend(label: string): HTMLElement {
+  const legend = document.createElement('div');
+  legend.className = 'asn1ib-form-legend';
+  legend.textContent = label;
+  return legend;
+}
+
+function renderFormHint(text: string): HTMLElement {
+  const hint = document.createElement('div');
+  hint.className = 'asn1ib-form-hint';
+  hint.textContent = text;
+  return hint;
+}
+
+function appendFieldDiagnostics(container: HTMLElement, diagnostics: InstanceDiagnostic[], path: FormPathSegment[]): void {
+  const matching = diagnostics.filter((diagnostic) => pathsMatch(diagnostic.path, path));
+  for (const diagnostic of matching) {
+    const message = document.createElement('div');
+    message.className = `asn1ib-form-diagnostic asn1ib-form-diagnostic-${diagnostic.severity}`;
+    message.textContent = diagnostic.message;
+    container.append(message);
+  }
+}
+
+function pathsMatch(diagnosticPath: string[], formPath: FormPathSegment[]): boolean {
+  if (diagnosticPath.length !== formPath.length) return false;
+  return diagnosticPath.every((segment, index) => segment === String(formPath[index]));
+}
+
+function createDefaultInput(schemaModule: Asn1SchemaModule, type: Asn1Type): unknown {
+  const resolved = resolveEditableType(schemaModule, type);
+  switch (resolved.kind) {
+    case 'boolean':
+      return false;
+    case 'integer':
+      return resolved.values?.[0]?.name ?? 0;
+    case 'enumerated':
+      return resolved.values[0]?.name ?? 0;
+    case 'bitString':
+      return { bytes: { hex: '' }, unusedBits: 0 };
+    case 'octetString':
+      return { hex: '' };
+    case 'null':
+      return null;
+    case 'objectIdentifier':
+    case 'utf8String':
+    case 'printableString':
+    case 'ia5String':
+    case 'utcTime':
+    case 'generalizedTime':
+      return '';
+    case 'sequence':
+    case 'set': {
+      const record: JsonObject = {};
+      for (const field of resolved.fields) {
+        if (field.optional || 'defaultValue' in field) continue;
+        record[field.name] = createDefaultInput(schemaModule, field.type);
+      }
+      return record;
+    }
+    case 'choice': {
+      const selected = resolved.alternatives[0];
+      return selected ? { selected: selected.name, value: createDefaultInput(schemaModule, selected.type) } : { selected: '', value: null };
+    }
+    case 'sequenceOf':
+    case 'setOf':
+      return [];
+  }
+}
+
+function resolveEditableType(schemaModule: Asn1SchemaModule, type: Asn1Type): Asn1Type {
+  if (type.kind === 'defined') return resolveEditableType(schemaModule, resolveDefinedType(schemaModule, type.typeName));
+  if (type.kind === 'tagged') return resolveEditableType(schemaModule, type.type);
+  return type;
+}
+
+function findChoiceAlternative(schemaModule: Asn1SchemaModule, type: Asn1Type, selected: string): Asn1Field | undefined {
+  const resolved = resolveEditableType(schemaModule, type);
+  return resolved.kind === 'choice' ? resolved.alternatives.find((alternative) => alternative.name === selected) : undefined;
+}
+
+function getByteMode(value: unknown): 'hex' | 'utf8' | 'base64' {
+  if (isPlainObject(value)) {
+    if (typeof value.utf8 === 'string') return 'utf8';
+    if (typeof value.base64 === 'string') return 'base64';
+  }
+  return 'hex';
+}
+
+function getByteContent(value: unknown, mode: 'hex' | 'utf8' | 'base64'): string {
+  if (isPlainObject(value) && typeof value[mode] === 'string') return value[mode];
+  if (typeof value === 'string' && mode === 'hex') return value;
+  return '';
+}
+
+function readControlValue(control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): unknown {
+  if (control.dataset.valueKind === 'boolean' && control instanceof HTMLInputElement) return control.checked;
+  if (control.dataset.valueKind === 'number') return Number.parseInt(control.value || '0', 10);
+  if (control.dataset.valueKind === 'null') return null;
+  return control.value;
+}
+
+function stringifyFormPath(path: FormPathSegment[]): string {
+  return JSON.stringify(path);
+}
+
+function parseFormPath(value: string): FormPathSegment[] {
+  const parsed = JSON.parse(value) as FormPathSegment[];
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function getValueAtPath(root: unknown, path: FormPathSegment[]): unknown {
+  let current = root;
+  for (const segment of path) {
+    if (Array.isArray(current) && typeof segment === 'number') current = current[segment];
+    else if (isPlainObject(current) && typeof segment === 'string') current = current[segment];
+    else return undefined;
+  }
+  return current;
+}
+
+function setValueAtPath(root: unknown, path: FormPathSegment[], value: unknown): unknown {
+  if (path.length === 0) return value;
+  const [head, ...tail] = path;
+  if (typeof head === 'number') {
+    const next = Array.isArray(root) ? [...root] : [];
+    next[head] = setValueAtPath(next[head], tail, value);
+    return next;
+  }
+  const next: JsonObject = isPlainObject(root) ? { ...root } : {};
+  next[head] = setValueAtPath(next[head], tail, value);
+  return next;
+}
+
+function setFormControlValue(root: unknown, path: FormPathSegment[], value: unknown): unknown {
+  if (path[path.length - 1] === 'unusedBits') {
+    const parentPath = path.slice(0, -1);
+    const parentValue = getValueAtPath(root, parentPath);
+    if (!isPlainObject(parentValue) || !('bytes' in parentValue)) {
+      return setValueAtPath(root, parentPath, { bytes: parentValue ?? { hex: '' }, unusedBits: value });
+    }
+  }
+  return setValueAtPath(root, path, value);
+}
+
+function removeValueAtPath(root: unknown, path: FormPathSegment[]): unknown {
+  if (path.length === 0) return undefined;
+  const [head, ...tail] = path;
+  if (typeof head === 'number') {
+    const next = Array.isArray(root) ? [...root] : [];
+    if (tail.length === 0) next.splice(head, 1);
+    else next[head] = removeValueAtPath(next[head], tail);
+    return next;
+  }
+  const next: JsonObject = isPlainObject(root) ? { ...root } : {};
+  if (tail.length === 0) delete next[head];
+  else next[head] = removeValueAtPath(next[head], tail);
+  return next;
+}
+
+function isPlainObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function closeMenuAfterSelection(button: HTMLButtonElement, focusTarget: HTMLElement): void {
