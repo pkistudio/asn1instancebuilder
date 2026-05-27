@@ -28,7 +28,8 @@ browser app shell or call the UI-independent core APIs directly.
   fixtures.
 - Schema diagnostics through `validateSchemaModule()` and instance diagnostics
   through `validateInstance()` before DER generation.
-- Browser app with Definition, Instance Input, Diagnostics, and API Log panes.
+- Browser app with Definition, hybrid Form/JSON Instance Input, Diagnostics,
+  and API Log panes.
 - Bundled `Load` -> `NamedObjects` examples for objects such as `Person`,
   `Certificate`, `CertificationRequest`, `CertificateList`, and `PkiBundle`.
 - Standalone PkiStudioJS viewer routing for generated DER.
