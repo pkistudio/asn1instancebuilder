@@ -120,7 +120,10 @@ entry also exports the `DefinitionBundle`, `DefinitionBundleDiagnostic`, and
 files through the same bundle path used by host integrations and built-in
 NamedObjects. `Save` -> `Definition Bundle` exports the current definition
 workspace, selected type, current sample input, and any active UI Profile
-metadata as a portable `.definition-bundle.json` file.
+metadata as a portable `.definition-bundle.json` file. When the workspace was
+loaded from a Definition Bundle, the export preserves bundle and selected-entry
+metadata such as id, label, description, version, and ASN.1 source name where
+possible.
 
 ```ts
 import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';

@@ -69,6 +69,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   let inputFormError: string | undefined;
   let activeSampleInputs: SampleInputMap | undefined;
   let activeUiProfiles: UiProfileMap | undefined;
+  let activeDefinitionBundle: DefinitionBundle | undefined;
+  let activeDefinitionBundleEntry: DefinitionBundle['entries'][number] | undefined;
   const apiLogEntries: ApiLogEntry[] = [];
 
   initializeWorkspaceResizer(mount, workspace, workspaceResizer);
@@ -151,6 +153,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     inputFormError = undefined;
     activeSampleInputs = undefined;
     activeUiProfiles = undefined;
+    activeDefinitionBundle = undefined;
+    activeDefinitionBundleEntry = undefined;
     definitionText.value = '';
     inputText.value = '';
     typeSelect.innerHTML = '';
@@ -163,6 +167,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
   const loadDefinitionText = (text: string, source: string, preferredTypeName?: string): boolean => {
     if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
+    activeDefinitionBundle = undefined;
+    activeDefinitionBundleEntry = undefined;
     definitionText.value = text;
     try {
       schema = parseDefinitionInput(text);
@@ -215,6 +221,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
   const loadSchemaModel = (nextSchema: Asn1SchemaModule, source: string, preferredTypeName?: string): boolean => {
     if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
+    activeDefinitionBundle = undefined;
+    activeDefinitionBundleEntry = undefined;
     schema = nextSchema;
     definitionText.value = JSON.stringify(nextSchema, null, 2);
     refreshTypeSelect(preferredTypeName);
@@ -243,6 +251,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     if (!loaded) return;
     activeSampleInputs = getDefinitionBundleSampleInputs(bundle);
     activeUiProfiles = getDefinitionBundleUiProfiles(bundle);
+    activeDefinitionBundle = bundle;
+    activeDefinitionBundleEntry = entry;
     if (!loadSampleInputForType(entry.typeName)) {
       input = 'defaultInput' in entry ? entry.defaultInput : createDefaultInputForSelectedType();
       inputText.value = JSON.stringify(input, null, 2);
@@ -314,6 +324,8 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       schema = nextSchema;
       activeSampleInputs = undefined;
       activeUiProfiles = undefined;
+      activeDefinitionBundle = undefined;
+      activeDefinitionBundleEntry = undefined;
       definitionText.value = JSON.stringify(schema, null, 2);
       refreshTypeSelect();
       currentInstanceDiagnostics = [];
@@ -418,6 +430,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     updateDefinitionActionState();
   });
   typeSelect.addEventListener('change', () => {
+    activeDefinitionBundleEntry = activeDefinitionBundle?.entries.find((entry) => entry.typeName === typeSelect.value);
     if (!loadSampleInputForType(typeSelect.value) && inputMode === 'form') {
       setInputValue(createDefaultInputForSelectedType());
     } else {
@@ -442,7 +455,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   });
   saveDefinitionBundleFileButton.addEventListener('click', () => {
     try {
-      const bundle = createDefinitionBundleFromWorkspace(definitionText.value, inputText.value, typeSelect.value, activeUiProfiles?.[typeSelect.value]);
+      const bundle = createDefinitionBundleFromWorkspace(definitionText.value, inputText.value, typeSelect.value, activeUiProfiles?.[typeSelect.value], activeDefinitionBundle, activeDefinitionBundleEntry);
       saveTextFile(JSON.stringify(bundle, null, 2), `${sanitizeFileName(bundle.id)}.definition-bundle.json`);
       appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinitionBundle', detail: `Saved ${bundle.id} as a Definition Bundle.` });
     } catch (error) {
@@ -626,28 +639,40 @@ function parseDefinitionInput(value: string): Asn1SchemaModule {
   return parseAsn1Definition(trimmed);
 }
 
-function createDefinitionBundleFromWorkspace(definitionSource: string, inputSource: string, typeName: string, uiProfile: UiProfile | undefined): DefinitionBundle {
+function createDefinitionBundleFromWorkspace(
+  definitionSource: string,
+  inputSource: string,
+  typeName: string,
+  uiProfile: UiProfile | undefined,
+  sourceBundle: DefinitionBundle | undefined,
+  sourceEntry: DefinitionBundle['entries'][number] | undefined
+): DefinitionBundle {
   const trimmedDefinition = definitionSource.trim();
   if (trimmedDefinition.length === 0) throw new Error('Load a definition before saving a Definition Bundle.');
   if (!typeName) throw new Error('Select an ASN.1 type before saving a Definition Bundle.');
 
-  const entryId = toKebabCase(typeName);
+  const entryId = sourceEntry?.id ?? toKebabCase(typeName);
   const entry: DefinitionBundle['entries'][number] = {
     id: entryId,
     typeName,
-    label: typeName
+    label: sourceEntry?.label ?? typeName
   };
+  if (sourceEntry?.description) entry.description = sourceEntry.description;
   const trimmedInput = inputSource.trim();
   if (trimmedInput.length > 0) entry.sampleInput = JSON.parse(trimmedInput) as unknown;
   if (uiProfile) entry.uiProfile = uiProfile;
+  const sourceSchema = sourceBundle?.schema;
+  const sourceName = sourceSchema && isRawAsn1BundleSchemaSource(sourceSchema) ? sourceSchema.sourceName ?? 'asn1-definition.asn1' : 'asn1-definition.asn1';
+  const schemaSource: DefinitionBundle['schema'] = trimmedDefinition.startsWith('{')
+    ? { format: 'schema-model', schema: JSON.parse(trimmedDefinition) as Asn1SchemaModule }
+    : { format: 'asn1', sourceName, source: trimmedDefinition };
 
   return {
-    id: `local.${entryId}`,
-    version: '1.0.0',
-    label: typeName,
-    schema: trimmedDefinition.startsWith('{')
-      ? { format: 'schema-model', schema: JSON.parse(trimmedDefinition) as Asn1SchemaModule }
-      : { format: 'asn1', sourceName: 'asn1-definition.asn1', source: trimmedDefinition },
+    id: sourceBundle?.id ?? `local.${entryId}`,
+    version: sourceBundle?.version ?? '1.0.0',
+    label: sourceBundle?.label ?? typeName,
+    ...(sourceBundle?.description ? { description: sourceBundle.description } : {}),
+    schema: schemaSource,
     entries: [entry]
   };
 }
