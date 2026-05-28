@@ -141,4 +141,39 @@ describe('NamedObjects Definition Bundle catalog', () => {
     expect(tbsCertListEntry?.sampleInput).toBeDefined();
     expect(tbsCertListEntry?.uiProfile).toBeUndefined();
   });
+
+  it('attaches a UI Profile to the PkiBundle primary entry', () => {
+    const pkiBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'pki-bundle');
+    const pkiBundleEntry = pkiBundle ? findDefinitionBundleEntry(pkiBundle, 'pki-bundle') : undefined;
+
+    expect(pkiBundleEntry?.uiProfile?.id).toBe('pkistudio.named-object.pki-bundle.ui-profile');
+    expect(pkiBundleEntry?.uiProfile?.typeName).toBe('PkiBundle');
+    expect(pkiBundleEntry?.uiProfile?.fields?.signature).toMatchObject({
+      label: 'Signature algorithm',
+      description: 'Algorithm identifier used by the demo PKI object.',
+      order: 0
+    });
+    expect(pkiBundleEntry?.uiProfile?.fields?.issuer).toMatchObject({
+      label: 'Issuer',
+      collapsed: true,
+      order: 1
+    });
+    expect(pkiBundleEntry?.uiProfile?.fields?.subjectPublicKeyInfo).toMatchObject({
+      label: 'Subject public key info',
+      collapsed: true,
+      order: 3
+    });
+    expect(pkiBundleEntry?.uiProfile?.fields?.['extension.extnValue']).toMatchObject({
+      label: 'Extension value',
+      inputMode: 'hex'
+    });
+  });
+
+  it('does not attach the PkiBundle UI Profile to child sample entries', () => {
+    const pkiBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'pki-bundle');
+    const algorithmIdentifierEntry = pkiBundle ? findDefinitionBundleEntry(pkiBundle, 'AlgorithmIdentifier') : undefined;
+
+    expect(algorithmIdentifierEntry?.sampleInput).toBeDefined();
+    expect(algorithmIdentifierEntry?.uiProfile).toBeUndefined();
+  });
 });
