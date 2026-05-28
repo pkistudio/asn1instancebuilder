@@ -1,6 +1,20 @@
 import type { Asn1SchemaModule } from '../core.js';
 import type { UiProfile } from './ui-profile.js';
 
+export type DefinitionBundleDiagnosticSeverity = 'error' | 'warning';
+
+export interface DefinitionBundleDiagnostic {
+  severity: DefinitionBundleDiagnosticSeverity;
+  code: string;
+  message: string;
+  path: string[];
+}
+
+export interface DefinitionBundleParseResult {
+  bundle?: DefinitionBundle;
+  diagnostics: DefinitionBundleDiagnostic[];
+}
+
 export type DefinitionBundleSchemaSource =
   | {
   /** Raw ASN.1 module text parsed into a Schema Model before building DER. */
@@ -50,25 +64,48 @@ export interface DefinitionBundle {
 }
 
 export function parseDefinitionBundleJson(source: string, sourceName = 'Definition Bundle JSON'): DefinitionBundle {
+  const result = parseDefinitionBundleJsonWithDiagnostics(source);
+  if (hasDefinitionBundleDiagnosticErrors(result.diagnostics)) {
+    throw new Error(formatDefinitionBundleDiagnosticError(result.diagnostics, sourceName));
+  }
+  if (!result.bundle) throw new Error(`${sourceName} could not be parsed as a Definition Bundle.`);
+  return result.bundle;
+}
+
+export function parseDefinitionBundleJsonWithDiagnostics(source: string): DefinitionBundleParseResult {
   let value: unknown;
   try {
     value = JSON.parse(source) as unknown;
   } catch (error) {
-    throw new Error(`${sourceName} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    return { diagnostics: [{ severity: 'error', code: 'invalid-json', message: `Definition Bundle JSON could not be parsed: ${error instanceof Error ? error.message : String(error)}`, path: [] }] };
   }
-  return asDefinitionBundle(value, sourceName);
+  const diagnostics = validateDefinitionBundle(value);
+  return hasDefinitionBundleDiagnosticErrors(diagnostics) ? { diagnostics } : { bundle: value as DefinitionBundle, diagnostics };
 }
 
 export function asDefinitionBundle(value: unknown, sourceName = 'Definition Bundle'): DefinitionBundle {
-  const bundle = requireRecord(value, sourceName);
-  requireString(bundle.id, `${sourceName}.id`);
-  requireString(bundle.version, `${sourceName}.version`);
-  requireString(bundle.label, `${sourceName}.label`);
-  optionalString(bundle.description, `${sourceName}.description`);
-  asDefinitionBundleSchemaSource(bundle.schema, `${sourceName}.schema`);
-  if (!Array.isArray(bundle.entries)) throw new Error(`${sourceName}.entries must be an array.`);
-  bundle.entries.forEach((entry, index) => validateDefinitionBundleEntry(entry, `${sourceName}.entries[${index}]`));
-  return bundle as unknown as DefinitionBundle;
+  const diagnostics = validateDefinitionBundle(value);
+  if (hasDefinitionBundleDiagnosticErrors(diagnostics)) throw new Error(formatDefinitionBundleDiagnosticError(diagnostics, sourceName));
+  return value as DefinitionBundle;
+}
+
+export function validateDefinitionBundle(value: unknown): DefinitionBundleDiagnostic[] {
+  const diagnostics: DefinitionBundleDiagnostic[] = [];
+  const bundle = validateRecord(value, [], diagnostics);
+  if (!bundle) return diagnostics;
+  validateString(bundle.id, ['id'], diagnostics, true);
+  validateString(bundle.version, ['version'], diagnostics, true);
+  validateString(bundle.label, ['label'], diagnostics, true);
+  validateString(bundle.description, ['description'], diagnostics, false);
+  validateDefinitionBundleSchemaSource(bundle.schema, ['schema'], diagnostics);
+  if (!Array.isArray(bundle.entries)) {
+    diagnostics.push({ severity: 'error', code: 'expected-array', message: 'Definition Bundle entries must be an array.', path: ['entries'] });
+  } else if (bundle.entries.length === 0) {
+    diagnostics.push({ severity: 'error', code: 'missing-entry', message: 'Definition Bundle entries must contain at least one entry.', path: ['entries'] });
+  } else {
+    bundle.entries.forEach((entry, index) => validateDefinitionBundleEntry(entry, ['entries', String(index)], diagnostics));
+  }
+  return diagnostics;
 }
 
 export function findDefinitionBundleEntry(bundle: DefinitionBundle, idOrTypeName: string): DefinitionBundleEntry | undefined {
@@ -105,41 +142,57 @@ export function isSchemaModelBundleSchemaSource(source: DefinitionBundleSchemaSo
   return source.format === 'schema-model';
 }
 
-function asDefinitionBundleSchemaSource(value: unknown, path: string): DefinitionBundleSchemaSource {
-  const source = requireRecord(value, path);
-  const format = requireString(source.format, `${path}.format`);
+function validateDefinitionBundleSchemaSource(value: unknown, path: string[], diagnostics: DefinitionBundleDiagnostic[]): void {
+  const source = validateRecord(value, path, diagnostics);
+  if (!source) return;
+  const format = validateString(source.format, [...path, 'format'], diagnostics, true);
   if (format === 'asn1') {
-    const asn1Source = requireString(source.source, `${path}.source`);
-    const sourceName = optionalString(source.sourceName, `${path}.sourceName`);
-    return sourceName === undefined ? { format: 'asn1', source: asn1Source } : { format: 'asn1', sourceName, source: asn1Source };
+    validateString(source.sourceName, [...path, 'sourceName'], diagnostics, false);
+    validateString(source.source, [...path, 'source'], diagnostics, true);
+  } else if (format === 'schema-model') {
+    validateRecord(source.schema, [...path, 'schema'], diagnostics);
+  } else if (format !== undefined) {
+    diagnostics.push({ severity: 'error', code: 'invalid-schema-format', message: 'Definition Bundle schema format must be "asn1" or "schema-model".', path: [...path, 'format'] });
   }
-  if (format === 'schema-model') {
-    return { format: 'schema-model', schema: requireRecord(source.schema, `${path}.schema`) as unknown as Asn1SchemaModule };
-  }
-  throw new Error(`${path}.format must be "asn1" or "schema-model".`);
 }
 
-function validateDefinitionBundleEntry(value: unknown, path: string): void {
-  const entry = requireRecord(value, path);
-  optionalString(entry.id, `${path}.id`);
-  requireString(entry.typeName, `${path}.typeName`);
-  optionalString(entry.label, `${path}.label`);
-  optionalString(entry.description, `${path}.description`);
-  if (entry.uiProfile !== undefined) requireRecord(entry.uiProfile, `${path}.uiProfile`);
+function validateDefinitionBundleEntry(value: unknown, path: string[], diagnostics: DefinitionBundleDiagnostic[]): void {
+  const entry = validateRecord(value, path, diagnostics);
+  if (!entry) return;
+  validateString(entry.id, [...path, 'id'], diagnostics, false);
+  validateString(entry.typeName, [...path, 'typeName'], diagnostics, true);
+  validateString(entry.label, [...path, 'label'], diagnostics, false);
+  validateString(entry.description, [...path, 'description'], diagnostics, false);
+  if (entry.uiProfile !== undefined) validateRecord(entry.uiProfile, [...path, 'uiProfile'], diagnostics);
 }
 
-function requireRecord(value: unknown, path: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object.`);
+function validateRecord(value: unknown, path: string[], diagnostics: DefinitionBundleDiagnostic[]): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    diagnostics.push({ severity: 'error', code: 'expected-object', message: 'Definition Bundle values must be JSON objects at this path.', path });
+    return undefined;
+  }
   return value as Record<string, unknown>;
 }
 
-function requireString(value: unknown, path: string): string {
-  if (typeof value !== 'string' || value.length === 0) throw new Error(`${path} must be a non-empty string.`);
+function validateString(value: unknown, path: string[], diagnostics: DefinitionBundleDiagnostic[], required: boolean): string | undefined {
+  if (value === undefined) {
+    if (required) diagnostics.push({ severity: 'error', code: 'missing-string', message: 'Definition Bundle field must be a non-empty string.', path });
+    return undefined;
+  }
+  if (typeof value !== 'string' || value.length === 0) {
+    diagnostics.push({ severity: 'error', code: 'invalid-string', message: 'Definition Bundle field must be a non-empty string.', path });
+    return undefined;
+  }
   return value;
 }
 
-function optionalString(value: unknown, path: string): string | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'string') throw new Error(`${path} must be a string when present.`);
-  return value;
+function hasDefinitionBundleDiagnosticErrors(diagnostics: DefinitionBundleDiagnostic[]): boolean {
+  return diagnostics.some((diagnostic) => diagnostic.severity === 'error');
+}
+
+function formatDefinitionBundleDiagnosticError(diagnostics: DefinitionBundleDiagnostic[], sourceName: string): string {
+  const firstError = diagnostics.find((diagnostic) => diagnostic.severity === 'error') ?? diagnostics[0];
+  if (!firstError) return `${sourceName} has no diagnostics.`;
+  const path = firstError.path.length > 0 ? ` at ${firstError.path.join('.')}` : '';
+  return `${sourceName} ${firstError.code}${path}: ${firstError.message}`;
 }
