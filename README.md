@@ -118,7 +118,9 @@ entry also exports the `DefinitionBundle`, `DefinitionBundleDiagnostic`, and
 `parseDefinitionBundleJsonWithDiagnostics()` helpers. In the browser app,
 `Load` -> `Definition Bundle` loads `.definition-bundle.json` or `.bundle.json`
 files through the same bundle path used by host integrations and built-in
-NamedObjects.
+NamedObjects. `Save` -> `Definition Bundle` exports the current definition
+workspace, selected type, current sample input, and any active UI Profile
+metadata as a portable `.definition-bundle.json` file.
 
 ```ts
 import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';
