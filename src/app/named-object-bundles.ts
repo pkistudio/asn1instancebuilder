@@ -1,4 +1,5 @@
 import type { DefinitionBundle } from './definition-bundle.js';
+import type { UiProfile } from './ui-profile.js';
 import binaryInputsDefinition from '../../fixtures/binary-inputs.asn1?raw';
 import defaultsAndEnumeratedDefinition from '../../fixtures/defaults-and-enumerated.asn1?raw';
 import minimalCrlDefinition from '../../fixtures/minimal-crl.asn1?raw';
@@ -34,6 +35,7 @@ interface NamedObjectBundleInput {
   sourceName: string;
   definition: string;
   sampleInputs: SampleInputMap;
+  uiProfile?: UiProfile;
 }
 
 export type NamedObjectDefinitionBundle = DefinitionBundle & {
@@ -107,6 +109,134 @@ const sharedPkiComponentSamples: SampleInputMap = {
   SubjectPublicKeyInfo: sharedSubjectPublicKeyInfoSample
 };
 
+const certificateUiProfile: UiProfile = {
+  id: 'pkistudio.named-object.certificate.ui-profile',
+  typeName: 'Certificate',
+  fields: {
+    tbsCertificate: {
+      label: 'TBSCertificate',
+      description: 'Signed certificate body.',
+      order: 0
+    },
+    signatureAlgorithm: {
+      label: 'Signature algorithm',
+      description: 'Algorithm identifier for the certificate signature.',
+      order: 1
+    },
+    signatureValue: {
+      label: 'Signature value',
+      description: 'BIT STRING containing the certificate signature.',
+      order: 2,
+      widget: 'bitString'
+    },
+    'signatureValue.bytes': {
+      label: 'Signature bytes',
+      inputMode: 'hex',
+      placeholder: 'deadbeef'
+    },
+    'signatureValue.unusedBits': {
+      label: 'Unused bits'
+    },
+    'tbsCertificate.version': {
+      label: 'Version',
+      description: 'X.509 certificate version.',
+      order: 0
+    },
+    'tbsCertificate.serialNumber': {
+      label: 'Serial number',
+      order: 1
+    },
+    'tbsCertificate.signature': {
+      label: 'TBS signature algorithm',
+      description: 'Algorithm used when signing the TBS certificate.',
+      order: 2
+    },
+    'tbsCertificate.signature.algorithm': {
+      label: 'Algorithm',
+      inputMode: 'oid',
+      placeholder: 'sha256WithRSAEncryption'
+    },
+    'tbsCertificate.issuer': {
+      label: 'Issuer',
+      description: 'Distinguished name of the issuing CA.',
+      order: 3,
+      collapsed: true
+    },
+    'tbsCertificate.validity': {
+      label: 'Validity',
+      description: 'Certificate validity period.',
+      order: 4
+    },
+    'tbsCertificate.validity.notBefore': {
+      label: 'Not before',
+      order: 0
+    },
+    'tbsCertificate.validity.notBefore.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'tbsCertificate.validity.notAfter': {
+      label: 'Not after',
+      order: 1
+    },
+    'tbsCertificate.validity.notAfter.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'tbsCertificate.subject': {
+      label: 'Subject',
+      description: 'Distinguished name of the certificate subject.',
+      order: 5,
+      collapsed: true
+    },
+    'tbsCertificate.subjectPublicKeyInfo': {
+      label: 'Subject public key info',
+      description: 'Subject key algorithm and public key bits.',
+      order: 6,
+      collapsed: true
+    },
+    'tbsCertificate.subjectPublicKeyInfo.algorithm': {
+      label: 'Public key algorithm'
+    },
+    'tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm': {
+      label: 'Algorithm',
+      inputMode: 'oid',
+      placeholder: 'rsaEncryption'
+    },
+    'tbsCertificate.subjectPublicKeyInfo.subjectPublicKey': {
+      label: 'Subject public key',
+      widget: 'bitString'
+    },
+    'tbsCertificate.subjectPublicKeyInfo.subjectPublicKey.bytes': {
+      label: 'Public key bytes',
+      inputMode: 'hex',
+      placeholder: '00'
+    },
+    'tbsCertificate.subjectPublicKeyInfo.subjectPublicKey.unusedBits': {
+      label: 'Unused bits'
+    },
+    'tbsCertificate.extensions': {
+      label: 'Extensions',
+      description: 'Optional certificate extensions.',
+      order: 7,
+      collapsed: true
+    },
+    'tbsCertificate.extensions.0.extnID': {
+      label: 'Extension OID',
+      inputMode: 'oid',
+      placeholder: 'basicConstraints'
+    },
+    'tbsCertificate.extensions.0.critical': {
+      label: 'Critical'
+    },
+    'tbsCertificate.extensions.0.extnValue': {
+      label: 'Extension value',
+      inputMode: 'hex',
+      placeholder: '30030101ff'
+    }
+  }
+};
+
 function createNamedObjectDefinitionBundle(input: NamedObjectBundleInput): NamedObjectDefinitionBundle {
   return {
     id: input.id,
@@ -121,7 +251,8 @@ function createNamedObjectDefinitionBundle(input: NamedObjectBundleInput): Named
       id: typeName === input.typeName ? input.id : undefined,
       typeName,
       label: typeName === input.typeName ? input.label : typeName,
-      sampleInput
+      sampleInput,
+      uiProfile: typeName === input.typeName ? input.uiProfile : undefined
     }))
   };
 }
@@ -135,7 +266,7 @@ export const namedObjectDefinitionBundles: readonly NamedObjectDefinitionBundle[
   createNamedObjectDefinitionBundle({ id: 'signed-record', label: 'SignedRecord', typeName: 'SignedRecord', sourceName: 'negative-integer.asn1', definition: negativeIntegerDefinition, sampleInputs: { Delta: 'minusOne', SignedRecord: signedRecordSample } }),
   createNamedObjectDefinitionBundle({ id: 'versioned-serial', label: 'VersionedSerial', typeName: 'VersionedSerial', sourceName: 'module-tags.asn1', definition: moduleTagsDefinition, sampleInputs: { Version: 'v3', VersionedSerial: x509VersionSample } }),
   createNamedObjectDefinitionBundle({ id: 'tbs-certificate-prefix', label: 'TBSCertificatePrefix', typeName: 'TBSCertificatePrefix', sourceName: 'x509-version.asn1', definition: x509VersionDefinition, sampleInputs: { Version: 'v3', TBSCertificatePrefix: x509VersionSample } }),
-  createNamedObjectDefinitionBundle({ id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample } }),
+  createNamedObjectDefinitionBundle({ id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample }, uiProfile: certificateUiProfile }),
   createNamedObjectDefinitionBundle({ id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } }),
   createNamedObjectDefinitionBundle({ id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } }),
   createNamedObjectDefinitionBundle({ id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } }),
