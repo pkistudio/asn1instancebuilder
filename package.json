@@ -1,6 +1,6 @@
 {
   "name": "@pkistudio/asn1instancebuilder",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Browser-first ASN.1 instance builder for creating DER data from schema models.",
   "type": "module",
   "main": "./dist/index.js",
