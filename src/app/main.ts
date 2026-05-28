@@ -52,6 +52,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const loadDefinitionBundleFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-bundle-file"]');
   const loadDefinitionClipboardButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-clipboard"]');
   const saveDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="save-definition-file"]');
+  const saveDefinitionBundleFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="save-definition-bundle-file"]');
   const closeDefinitionButton = mustFind<HTMLButtonElement>(mount, '[data-role="close-definition"]');
   const namedObjectButtons = Array.from(mount.querySelectorAll<HTMLButtonElement>('[data-role="load-named-object"]'));
   const definitionStatus = mustFind<HTMLElement>(mount, '[data-role="definition-status"]');
@@ -439,6 +440,17 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     saveTextFile(definitionText.value, 'asn1-definition.asn1');
     appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinition', detail: 'Saved the definition text to asn1-definition.asn1.' });
   });
+  saveDefinitionBundleFileButton.addEventListener('click', () => {
+    try {
+      const bundle = createDefinitionBundleFromWorkspace(definitionText.value, inputText.value, typeSelect.value, activeUiProfiles?.[typeSelect.value]);
+      saveTextFile(JSON.stringify(bundle, null, 2), `${sanitizeFileName(bundle.id)}.definition-bundle.json`);
+      appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinitionBundle', detail: `Saved ${bundle.id} as a Definition Bundle.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      definitionStatus.textContent = `Could not save Definition Bundle: ${message}`;
+      appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'saveDefinitionBundle-error', detail: definitionStatus.textContent });
+    }
+  });
   for (const button of namedObjectButtons) {
     button.addEventListener('click', () => {
       const namedObject = namedObjectDefinitionBundles.find((bundle) => bundle.id === button.dataset.objectId);
@@ -528,6 +540,7 @@ function renderShell(): string {
             <button type="button" aria-haspopup="menu">Save</button>
             <div class="asn1ib-submenu" role="menu">
               <button type="button" role="menuitem" data-role="save-definition-file">to File</button>
+              <button type="button" role="menuitem" data-role="save-definition-bundle-file">Definition Bundle</button>
             </div>
           </div>
           <button type="button" data-role="close-definition" disabled>Close</button>
@@ -611,6 +624,44 @@ function parseDefinitionInput(value: string): Asn1SchemaModule {
   const trimmed = value.trim();
   if (trimmed.startsWith('{')) return JSON.parse(trimmed) as Asn1SchemaModule;
   return parseAsn1Definition(trimmed);
+}
+
+function createDefinitionBundleFromWorkspace(definitionSource: string, inputSource: string, typeName: string, uiProfile: UiProfile | undefined): DefinitionBundle {
+  const trimmedDefinition = definitionSource.trim();
+  if (trimmedDefinition.length === 0) throw new Error('Load a definition before saving a Definition Bundle.');
+  if (!typeName) throw new Error('Select an ASN.1 type before saving a Definition Bundle.');
+
+  const entryId = toKebabCase(typeName);
+  const entry: DefinitionBundle['entries'][number] = {
+    id: entryId,
+    typeName,
+    label: typeName
+  };
+  const trimmedInput = inputSource.trim();
+  if (trimmedInput.length > 0) entry.sampleInput = JSON.parse(trimmedInput) as unknown;
+  if (uiProfile) entry.uiProfile = uiProfile;
+
+  return {
+    id: `local.${entryId}`,
+    version: '1.0.0',
+    label: typeName,
+    schema: trimmedDefinition.startsWith('{')
+      ? { format: 'schema-model', schema: JSON.parse(trimmedDefinition) as Asn1SchemaModule }
+      : { format: 'asn1', sourceName: 'asn1-definition.asn1', source: trimmedDefinition },
+    entries: [entry]
+  };
+}
+
+function toKebabCase(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'definition-bundle';
+}
+
+function sanitizeFileName(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'definition-bundle';
 }
 
 type AppDiagnostic = SchemaDiagnostic | InstanceDiagnostic | DefinitionBundleDiagnostic;
