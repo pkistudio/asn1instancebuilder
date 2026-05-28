@@ -237,6 +237,95 @@ const certificateUiProfile: UiProfile = {
   }
 };
 
+const pkiBundleUiProfile: UiProfile = {
+  id: 'pkistudio.named-object.pki-bundle.ui-profile',
+  typeName: 'PkiBundle',
+  fields: {
+    signature: {
+      label: 'Signature algorithm',
+      description: 'Algorithm identifier used by the demo PKI object.',
+      order: 0
+    },
+    'signature.algorithm': {
+      label: 'Algorithm',
+      inputMode: 'oid',
+      placeholder: 'sha256WithRSAEncryption'
+    },
+    issuer: {
+      label: 'Issuer',
+      description: 'Distinguished name of the issuing CA.',
+      order: 1,
+      collapsed: true
+    },
+    validity: {
+      label: 'Validity',
+      description: 'Validity period for the demo PKI object.',
+      order: 2
+    },
+    'validity.notBefore': {
+      label: 'Not before',
+      order: 0
+    },
+    'validity.notBefore.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'validity.notAfter': {
+      label: 'Not after',
+      order: 1
+    },
+    'validity.notAfter.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    subjectPublicKeyInfo: {
+      label: 'Subject public key info',
+      description: 'Subject key algorithm and public key bits.',
+      order: 3,
+      collapsed: true
+    },
+    'subjectPublicKeyInfo.algorithm': {
+      label: 'Public key algorithm'
+    },
+    'subjectPublicKeyInfo.algorithm.algorithm': {
+      label: 'Algorithm',
+      inputMode: 'oid',
+      placeholder: 'rsaEncryption'
+    },
+    'subjectPublicKeyInfo.subjectPublicKey': {
+      label: 'Subject public key',
+      widget: 'bitString'
+    },
+    'subjectPublicKeyInfo.subjectPublicKey.bytes': {
+      label: 'Public key bytes',
+      inputMode: 'hex',
+      placeholder: '00'
+    },
+    'subjectPublicKeyInfo.subjectPublicKey.unusedBits': {
+      label: 'Unused bits'
+    },
+    extension: {
+      label: 'Extension',
+      description: 'Optional extension carried by the demo PKI object.',
+      order: 4,
+      collapsed: true
+    },
+    'extension.extnID': {
+      label: 'Extension OID',
+      inputMode: 'oid',
+      placeholder: 'basicConstraints'
+    },
+    'extension.critical': {
+      label: 'Critical'
+    },
+    'extension.extnValue': {
+      label: 'Extension value',
+      inputMode: 'hex',
+      placeholder: '30030101ff'
+    }
+  }
+};
+
 function createNamedObjectDefinitionBundle(input: NamedObjectBundleInput): NamedObjectDefinitionBundle {
   return {
     id: input.id,
@@ -270,5 +359,5 @@ export const namedObjectDefinitionBundles: readonly NamedObjectDefinitionBundle[
   createNamedObjectDefinitionBundle({ id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample } }),
   createNamedObjectDefinitionBundle({ id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } }),
   createNamedObjectDefinitionBundle({ id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } }),
-  createNamedObjectDefinitionBundle({ id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample } })
+  createNamedObjectDefinitionBundle({ id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample }, uiProfile: pkiBundleUiProfile })
 ];
