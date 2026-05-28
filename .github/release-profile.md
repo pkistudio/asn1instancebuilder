@@ -33,6 +33,7 @@
 - npm publication requires explicit user approval.
 - GitHub Release requires explicit user approval.
 - Stable published tags should have a GitHub Release marked as latest unless the user instructs otherwise.
+- GitHub Release name pattern: `<tag>` only, such as `v0.1.7`. Do not prefix the product name.
 - WordPress post workflow: `.github/workflows/publish-release-to-wordpress.yml`
 - WordPress post title pattern: `ASN.1 Instance Builder <tag> をリリースしました`
 
