@@ -113,7 +113,10 @@ await app.build(false);
 Hosts can also pass an initial Schema Model and instance input, call
 `loadSchema(schema)` and `loadInput(input)`, or load a Definition Bundle with
 `loadBundle(bundle, entryIdOrTypeName?)` on the returned app instance. The app
-entry also exports the `DefinitionBundle` and `UiProfile` TypeScript types.
+entry also exports the `DefinitionBundle` and `UiProfile` TypeScript types. In
+the browser app, `Load` -> `Definition Bundle` loads `.definition-bundle.json`
+or `.bundle.json` files through the same bundle path used by host integrations
+and built-in NamedObjects.
 
 ```ts
 import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';
@@ -204,7 +207,7 @@ helpers so hosts can attach private metadata. When both `sampleInput` and
 `defaultInput` is the fallback starting value.
 
 See `fixtures/person.definition-bundle.json` for a complete raw ASN.1 bundle
-example.
+example that can be loaded from `Load` -> `Definition Bundle`.
 
 For mounting, app instance methods, host boundaries, and viewer routing, see
 [Embedding](https://github.com/pkistudio/asn1instancebuilder/wiki/Embedding).

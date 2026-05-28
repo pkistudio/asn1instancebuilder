@@ -49,6 +49,28 @@ export interface DefinitionBundle {
   entries: DefinitionBundleEntry[];
 }
 
+export function parseDefinitionBundleJson(source: string, sourceName = 'Definition Bundle JSON'): DefinitionBundle {
+  let value: unknown;
+  try {
+    value = JSON.parse(source) as unknown;
+  } catch (error) {
+    throw new Error(`${sourceName} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return asDefinitionBundle(value, sourceName);
+}
+
+export function asDefinitionBundle(value: unknown, sourceName = 'Definition Bundle'): DefinitionBundle {
+  const bundle = requireRecord(value, sourceName);
+  requireString(bundle.id, `${sourceName}.id`);
+  requireString(bundle.version, `${sourceName}.version`);
+  requireString(bundle.label, `${sourceName}.label`);
+  optionalString(bundle.description, `${sourceName}.description`);
+  asDefinitionBundleSchemaSource(bundle.schema, `${sourceName}.schema`);
+  if (!Array.isArray(bundle.entries)) throw new Error(`${sourceName}.entries must be an array.`);
+  bundle.entries.forEach((entry, index) => validateDefinitionBundleEntry(entry, `${sourceName}.entries[${index}]`));
+  return bundle as unknown as DefinitionBundle;
+}
+
 export function findDefinitionBundleEntry(bundle: DefinitionBundle, idOrTypeName: string): DefinitionBundleEntry | undefined {
   return bundle.entries.find((entry) => entry.id === idOrTypeName) ?? bundle.entries.find((entry) => entry.typeName === idOrTypeName);
 }
@@ -81,4 +103,43 @@ export function isRawAsn1BundleSchemaSource(source: DefinitionBundleSchemaSource
 
 export function isSchemaModelBundleSchemaSource(source: DefinitionBundleSchemaSource): source is Extract<DefinitionBundleSchemaSource, { format: 'schema-model' }> {
   return source.format === 'schema-model';
+}
+
+function asDefinitionBundleSchemaSource(value: unknown, path: string): DefinitionBundleSchemaSource {
+  const source = requireRecord(value, path);
+  const format = requireString(source.format, `${path}.format`);
+  if (format === 'asn1') {
+    const asn1Source = requireString(source.source, `${path}.source`);
+    const sourceName = optionalString(source.sourceName, `${path}.sourceName`);
+    return sourceName === undefined ? { format: 'asn1', source: asn1Source } : { format: 'asn1', sourceName, source: asn1Source };
+  }
+  if (format === 'schema-model') {
+    return { format: 'schema-model', schema: requireRecord(source.schema, `${path}.schema`) as unknown as Asn1SchemaModule };
+  }
+  throw new Error(`${path}.format must be "asn1" or "schema-model".`);
+}
+
+function validateDefinitionBundleEntry(value: unknown, path: string): void {
+  const entry = requireRecord(value, path);
+  optionalString(entry.id, `${path}.id`);
+  requireString(entry.typeName, `${path}.typeName`);
+  optionalString(entry.label, `${path}.label`);
+  optionalString(entry.description, `${path}.description`);
+  if (entry.uiProfile !== undefined) requireRecord(entry.uiProfile, `${path}.uiProfile`);
+}
+
+function requireRecord(value: unknown, path: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function requireString(value: unknown, path: string): string {
+  if (typeof value !== 'string' || value.length === 0) throw new Error(`${path} must be a non-empty string.`);
+  return value;
+}
+
+function optionalString(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Error(`${path} must be a string when present.`);
+  return value;
 }
