@@ -180,6 +180,8 @@ textarea {
   left: 0;
   display: none;
   min-width: 132px;
+  width: max-content;
+  max-width: calc(100dvw - 16px);
   border: 1px solid var(--panel-border);
   border-radius: 3px;
   padding: 3px;
@@ -200,6 +202,7 @@ textarea {
 .asn1ib-submenu button {
   width: 100%;
   text-align: left;
+  white-space: nowrap;
 }
 
 .asn1ib-submenu .asn1ib-menu-item {

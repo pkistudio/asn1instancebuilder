@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, type DefinitionBundle } from '../src/app/definition-bundle';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, parseDefinitionBundleJson, type DefinitionBundle } from '../src/app/definition-bundle';
 
 const bundle: DefinitionBundle = {
   id: 'pkistudio.example.person',
@@ -84,5 +84,30 @@ describe('Definition Bundle helpers', () => {
 
     expect(isRawAsn1BundleSchemaSource(parsedBundle.schema)).toBe(false);
     expect(isSchemaModelBundleSchemaSource(parsedBundle.schema)).toBe(true);
+  });
+
+  it('parses Definition Bundle JSON while preserving unknown host metadata', () => {
+    const parsed = parseDefinitionBundleJson(JSON.stringify({
+      ...bundle,
+      hostMetadata: { owner: 'downstream-host' }
+    }), 'person.definition-bundle.json') as DefinitionBundle & { hostMetadata?: { owner: string } };
+
+    expect(parsed.id).toBe('pkistudio.example.person');
+    expect(parsed.entries[0]?.sampleInput).toBe('Alice');
+    expect(parsed.hostMetadata?.owner).toBe('downstream-host');
+  });
+
+  it('rejects Definition Bundle JSON with missing required fields', () => {
+    expect(() => parseDefinitionBundleJson(JSON.stringify({
+      id: 'pkistudio.example.invalid',
+      version: '1.0.0',
+      label: 'Invalid Bundle',
+      schema: { format: 'asn1', source: 'Example DEFINITIONS ::= BEGIN Person ::= UTF8String END' },
+      entries: [{}]
+    }), 'invalid.definition-bundle.json')).toThrow('invalid.definition-bundle.json.entries[0].typeName must be a non-empty string.');
+  });
+
+  it('rejects malformed Definition Bundle JSON', () => {
+    expect(() => parseDefinitionBundleJson('{', 'broken.definition-bundle.json')).toThrow('broken.definition-bundle.json is not valid JSON');
   });
 });

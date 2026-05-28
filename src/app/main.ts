@@ -1,5 +1,5 @@
 import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, type DefinitionBundle } from './definition-bundle.js';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, parseDefinitionBundleJson, type DefinitionBundle } from './definition-bundle.js';
 import { createDefaultInput, findChoiceAlternative, getValueAtPath, parseFormPath, removeValueAtPath, setFormControlValue, setValueAtPath } from './form-model.js';
 import { readFormControlValue, renderInputForm, updateInputModeButtons, type InputMode } from './form-renderer.js';
 import { namedObjectDefinitionBundles } from './named-object-bundles.js';
@@ -35,6 +35,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
 
   const definitionText = mustFind<HTMLTextAreaElement>(mount, '[data-role="definition"]');
   const definitionFileInput = mustFind<HTMLInputElement>(mount, '[data-role="definition-file"]');
+  const definitionBundleFileInput = mustFind<HTMLInputElement>(mount, '[data-role="definition-bundle-file"]');
   const inputText = mustFind<HTMLTextAreaElement>(mount, '[data-role="input"]');
   const inputForm = mustFind<HTMLElement>(mount, '[data-role="input-form"]');
   const inputModeButtons = Array.from(mount.querySelectorAll<HTMLButtonElement>('[data-role="input-mode"]'));
@@ -48,6 +49,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   const apiLogResizer = mustFind<HTMLElement>(mount, '[data-role="api-log-resizer"]');
   const clearApiLogButton = mustFind<HTMLButtonElement>(mount, '[data-role="clear-api-log"]');
   const loadDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-file"]');
+  const loadDefinitionBundleFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-bundle-file"]');
   const loadDefinitionClipboardButton = mustFind<HTMLButtonElement>(mount, '[data-role="load-definition-clipboard"]');
   const saveDefinitionFileButton = mustFind<HTMLButtonElement>(mount, '[data-role="save-definition-file"]');
   const closeDefinitionButton = mustFind<HTMLButtonElement>(mount, '[data-role="close-definition"]');
@@ -422,6 +424,7 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     }
   });
   loadDefinitionFileButton.addEventListener('click', () => definitionFileInput.click());
+  loadDefinitionBundleFileButton.addEventListener('click', () => definitionBundleFileInput.click());
   loadDefinitionClipboardButton.addEventListener('click', async () => {
     try {
       if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
@@ -456,6 +459,21 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
       appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'file-read-error', detail: definitionStatus.textContent });
     }
   });
+  definitionBundleFileInput.addEventListener('change', async () => {
+    const file = definitionBundleFileInput.files?.[0];
+    definitionBundleFileInput.value = '';
+    if (!file) return;
+    try {
+      if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
+      const bundle = parseDefinitionBundleJson(await file.text(), file.name);
+      loadDefinitionBundle(bundle, undefined, 'DefinitionBundle file');
+    } catch (error) {
+      definitionStatus.textContent = `Could not load Definition Bundle file: ${error instanceof Error ? error.message : String(error)}`;
+      appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'loadBundle-error', detail: definitionStatus.textContent });
+      updateDefinitionActionState();
+      renderActiveInputEditor();
+    }
+  });
   buildButton.addEventListener('click', () => void app.build());
   aboutButton.addEventListener('click', () => {
     if (typeof aboutDialog.showModal === 'function') {
@@ -484,8 +502,9 @@ function renderShell(): string {
           <div class="asn1ib-menu-item">
             <button type="button" aria-haspopup="menu">Load</button>
             <div class="asn1ib-submenu" role="menu">
-              <button type="button" role="menuitem" data-role="load-definition-file">from File</button>
+              <button type="button" role="menuitem" data-role="load-definition-file">from ASN.1/Schema File</button>
               <button type="button" role="menuitem" data-role="load-definition-clipboard">from Clipboard</button>
+              <button type="button" role="menuitem" data-role="load-definition-bundle-file">Definition Bundle</button>
               <div class="asn1ib-menu-item asn1ib-nested-menu-item" role="none">
                 <button type="button" role="menuitem" aria-haspopup="menu">NamedObjects</button>
                 <div class="asn1ib-submenu asn1ib-named-objects-menu" role="menu">
@@ -505,6 +524,7 @@ function renderShell(): string {
         <div class="asn1ib-left-card">
           <textarea data-role="definition" spellcheck="false" readonly></textarea>
           <input data-role="definition-file" type="file" accept=".asn1,.txt,.json,application/json,text/plain" hidden />
+          <input data-role="definition-bundle-file" type="file" accept=".definition-bundle.json,.bundle.json,application/json" hidden />
           <p class="asn1ib-notice asn1ib-definition-status" data-role="definition-status">Definition input is ready.</p>
         </div>
       </section>
