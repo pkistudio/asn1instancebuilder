@@ -106,4 +106,39 @@ describe('NamedObjects Definition Bundle catalog', () => {
     expect(csrInfoEntry?.sampleInput).toBeDefined();
     expect(csrInfoEntry?.uiProfile).toBeUndefined();
   });
+
+  it('attaches a UI Profile to the CertificateList primary entry', () => {
+    const crlBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'certificate-list');
+    const crlEntry = crlBundle ? findDefinitionBundleEntry(crlBundle, 'certificate-list') : undefined;
+
+    expect(crlEntry?.uiProfile?.id).toBe('pkistudio.named-object.certificate-list.ui-profile');
+    expect(crlEntry?.uiProfile?.typeName).toBe('CertificateList');
+    expect(crlEntry?.uiProfile?.fields?.tbsCertList).toMatchObject({
+      label: 'TBSCertList',
+      description: 'Signed certificate revocation list body.',
+      order: 0
+    });
+    expect(crlEntry?.uiProfile?.fields?.['tbsCertList.issuer']).toMatchObject({
+      label: 'Issuer',
+      collapsed: true,
+      order: 2
+    });
+    expect(crlEntry?.uiProfile?.fields?.['tbsCertList.revokedCertificates']).toMatchObject({
+      label: 'Revoked certificates',
+      collapsed: true,
+      order: 5
+    });
+    expect(crlEntry?.uiProfile?.fields?.['signatureValue.bytes']).toMatchObject({
+      label: 'Signature bytes',
+      inputMode: 'hex'
+    });
+  });
+
+  it('does not attach the CertificateList UI Profile to child sample entries', () => {
+    const crlBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'certificate-list');
+    const tbsCertListEntry = crlBundle ? findDefinitionBundleEntry(crlBundle, 'TBSCertList') : undefined;
+
+    expect(tbsCertListEntry?.sampleInput).toBeDefined();
+    expect(tbsCertListEntry?.uiProfile).toBeUndefined();
+  });
 });

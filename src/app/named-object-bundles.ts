@@ -319,6 +319,113 @@ const certificationRequestUiProfile: UiProfile = {
   }
 };
 
+const certificateListUiProfile: UiProfile = {
+  id: 'pkistudio.named-object.certificate-list.ui-profile',
+  typeName: 'CertificateList',
+  fields: {
+    tbsCertList: {
+      label: 'TBSCertList',
+      description: 'Signed certificate revocation list body.',
+      order: 0
+    },
+    signatureAlgorithm: {
+      label: 'Signature algorithm',
+      description: 'Algorithm identifier for the CRL signature.',
+      order: 1
+    },
+    signatureValue: {
+      label: 'Signature value',
+      description: 'BIT STRING containing the CRL signature.',
+      order: 2,
+      widget: 'bitString'
+    },
+    'signatureValue.bytes': {
+      label: 'Signature bytes',
+      inputMode: 'hex',
+      placeholder: '0102030405060708'
+    },
+    'signatureValue.unusedBits': {
+      label: 'Unused bits'
+    },
+    'tbsCertList.version': {
+      label: 'Version',
+      description: 'X.509 CRL version.',
+      order: 0
+    },
+    'tbsCertList.signature': {
+      label: 'TBS signature algorithm',
+      description: 'Algorithm used when signing the TBS CRL.',
+      order: 1
+    },
+    'tbsCertList.signature.algorithm': {
+      label: 'Algorithm',
+      inputMode: 'oid',
+      placeholder: 'sha256WithRSAEncryption'
+    },
+    'tbsCertList.issuer': {
+      label: 'Issuer',
+      description: 'Distinguished name of the CRL issuer.',
+      order: 2,
+      collapsed: true
+    },
+    'tbsCertList.thisUpdate': {
+      label: 'This update',
+      order: 3
+    },
+    'tbsCertList.thisUpdate.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'tbsCertList.nextUpdate': {
+      label: 'Next update',
+      order: 4
+    },
+    'tbsCertList.nextUpdate.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'tbsCertList.revokedCertificates': {
+      label: 'Revoked certificates',
+      description: 'Optional list of revoked certificate entries.',
+      order: 5,
+      collapsed: true
+    },
+    'tbsCertList.revokedCertificates.0.userCertificate': {
+      label: 'User certificate serial number'
+    },
+    'tbsCertList.revokedCertificates.0.revocationDate': {
+      label: 'Revocation date'
+    },
+    'tbsCertList.revokedCertificates.0.revocationDate.value': {
+      label: 'UTCTime value',
+      placeholder: 'YYMMDDHHMMSSZ'
+    },
+    'tbsCertList.revokedCertificates.0.crlEntryExtensions': {
+      label: 'CRL entry extensions',
+      collapsed: true
+    },
+    'tbsCertList.crlExtensions': {
+      label: 'CRL extensions',
+      description: 'Optional extensions that apply to the CRL as a whole.',
+      order: 6,
+      collapsed: true
+    },
+    'tbsCertList.crlExtensions.0.extnID': {
+      label: 'Extension OID',
+      inputMode: 'oid',
+      placeholder: 'authorityKeyIdentifier'
+    },
+    'tbsCertList.crlExtensions.0.critical': {
+      label: 'Critical'
+    },
+    'tbsCertList.crlExtensions.0.extnValue': {
+      label: 'Extension value',
+      inputMode: 'hex',
+      placeholder: '3006800401020304'
+    }
+  }
+};
+
 function createNamedObjectDefinitionBundle(input: NamedObjectBundleInput): NamedObjectDefinitionBundle {
   return {
     id: input.id,
@@ -350,7 +457,7 @@ export const namedObjectDefinitionBundles: readonly NamedObjectDefinitionBundle[
   createNamedObjectDefinitionBundle({ id: 'tbs-certificate-prefix', label: 'TBSCertificatePrefix', typeName: 'TBSCertificatePrefix', sourceName: 'x509-version.asn1', definition: x509VersionDefinition, sampleInputs: { Version: 'v3', TBSCertificatePrefix: x509VersionSample } }),
   createNamedObjectDefinitionBundle({ id: 'certificate', label: 'Certificate', typeName: 'Certificate', sourceName: 'minimal-tbs-certificate.asn1', definition: minimalTbsCertificateDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v3', TBSCertificate: tbsCertificateSample, Certificate: certificateSample }, uiProfile: certificateUiProfile }),
   createNamedObjectDefinitionBundle({ id: 'certification-request', label: 'CertificationRequest', typeName: 'CertificationRequest', sourceName: 'minimal-csr.asn1', definition: minimalCsrDefinition, sampleInputs: { ...pkiComponentSamples, AttributeValue: attributeValueSample, AttributeValues: attributeValuesSample, Attribute: attributeSample, Attributes: attributesSample, CertificationRequestInfo: certificationRequestSample.certificationRequestInfo, CertificationRequest: certificationRequestSample }, uiProfile: certificationRequestUiProfile }),
-  createNamedObjectDefinitionBundle({ id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample } }),
+  createNamedObjectDefinitionBundle({ id: 'certificate-list', label: 'CertificateList', typeName: 'CertificateList', sourceName: 'minimal-crl.asn1', definition: minimalCrlDefinition, sampleInputs: { ...pkiComponentSamples, Version: 'v2', RevokedCertificate: revokedCertificateSample, RevokedCertificates: revokedCertificatesSample, TBSCertList: certificateListSample.tbsCertList, CertificateList: certificateListSample }, uiProfile: certificateListUiProfile }),
   createNamedObjectDefinitionBundle({ id: 'algorithm-identifier', label: 'AlgorithmIdentifier', typeName: 'AlgorithmIdentifier', sourceName: 'oid-names.asn1', definition: oidNamesDefinition, sampleInputs: { AlgorithmIdentifier: algorithmIdentifierSample } }),
   createNamedObjectDefinitionBundle({ id: 'pki-bundle', label: 'PkiBundle', typeName: 'PkiBundle', sourceName: 'pki-components.asn1', definition: pkiComponentsDefinition, sampleInputs: { ...sharedPkiComponentSamples, PkiBundle: pkiBundleSample } })
 ];
