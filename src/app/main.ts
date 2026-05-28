@@ -667,13 +667,18 @@ function createDefinitionBundleFromWorkspace(
     ? { format: 'schema-model', schema: JSON.parse(trimmedDefinition) as Asn1SchemaModule }
     : { format: 'asn1', sourceName, source: trimmedDefinition };
 
+  const entries = sourceBundle
+    ? sourceBundle.entries.map((bundleEntry) => bundleEntry === sourceEntry ? entry : bundleEntry)
+    : [entry];
+  if (sourceBundle && !sourceEntry) entries.push(entry);
+
   return {
     id: sourceBundle?.id ?? `local.${entryId}`,
     version: sourceBundle?.version ?? '1.0.0',
     label: sourceBundle?.label ?? typeName,
     ...(sourceBundle?.description ? { description: sourceBundle.description } : {}),
     schema: schemaSource,
-    entries: [entry]
+    entries
   };
 }
 

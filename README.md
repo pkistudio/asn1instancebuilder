@@ -123,7 +123,8 @@ workspace, selected type, current sample input, and any active UI Profile
 metadata as a portable `.definition-bundle.json` file. When the workspace was
 loaded from a Definition Bundle, the export preserves bundle and selected-entry
 metadata such as id, label, description, version, and ASN.1 source name where
-possible.
+possible. Non-selected entries from the loaded bundle are preserved as part of
+the exported bundle.
 
 ```ts
 import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';
