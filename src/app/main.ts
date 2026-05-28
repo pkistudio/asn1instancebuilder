@@ -1,5 +1,5 @@
 import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, parseDefinitionBundleJson, type DefinitionBundle } from './definition-bundle.js';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, parseDefinitionBundleJsonWithDiagnostics, type DefinitionBundle, type DefinitionBundleDiagnostic } from './definition-bundle.js';
 import { createDefaultInput, findChoiceAlternative, getValueAtPath, parseFormPath, removeValueAtPath, setFormControlValue, setValueAtPath } from './form-model.js';
 import { readFormControlValue, renderInputForm, updateInputModeButtons, type InputMode } from './form-renderer.js';
 import { namedObjectDefinitionBundles } from './named-object-bundles.js';
@@ -465,7 +465,18 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
     if (!file) return;
     try {
       if (definitionText.value.trim().length > 0) clearDefinitionWorkspace();
-      const bundle = parseDefinitionBundleJson(await file.text(), file.name);
+      const result = parseDefinitionBundleJsonWithDiagnostics(await file.text());
+      if (hasDiagnosticErrors(result.diagnostics) || !result.bundle) {
+        renderDiagnostics(diagnosticsList, [{ title: 'Definition Bundle', diagnostics: result.diagnostics }]);
+        definitionStatus.textContent = `Could not load Definition Bundle file ${file.name}: ${formatDiagnosticSummary(result.diagnostics)}`;
+        buildStatus.textContent = 'Build status is waiting for a valid Definition Bundle.';
+        appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'validateDefinitionBundle', detail: `${file.name}: ${formatDiagnosticSummary(result.diagnostics)}` });
+        updateDefinitionActionState();
+        renderActiveInputEditor();
+        return;
+      }
+      appendApiLog(apiLog, apiLogEntries, { level: result.diagnostics.length > 0 ? 'warning' : 'success', label: 'validateDefinitionBundle', detail: `${file.name}: ${formatDiagnosticSummary(result.diagnostics)}` });
+      const bundle = result.bundle;
       loadDefinitionBundle(bundle, undefined, 'DefinitionBundle file');
     } catch (error) {
       definitionStatus.textContent = `Could not load Definition Bundle file: ${error instanceof Error ? error.message : String(error)}`;
@@ -602,7 +613,7 @@ function parseDefinitionInput(value: string): Asn1SchemaModule {
   return parseAsn1Definition(trimmed);
 }
 
-type AppDiagnostic = SchemaDiagnostic | InstanceDiagnostic;
+type AppDiagnostic = SchemaDiagnostic | InstanceDiagnostic | DefinitionBundleDiagnostic;
 
 type ApiLogLevel = 'info' | 'success' | 'warning' | 'error';
 

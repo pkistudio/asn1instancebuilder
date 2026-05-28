@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, parseDefinitionBundleJson, type DefinitionBundle } from '../src/app/definition-bundle';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, isSchemaModelBundleSchemaSource, parseDefinitionBundleJson, parseDefinitionBundleJsonWithDiagnostics, validateDefinitionBundle, type DefinitionBundle } from '../src/app/definition-bundle';
 
 const bundle: DefinitionBundle = {
   id: 'pkistudio.example.person',
@@ -97,6 +97,32 @@ describe('Definition Bundle helpers', () => {
     expect(parsed.hostMetadata?.owner).toBe('downstream-host');
   });
 
+  it('returns Definition Bundle diagnostics without throwing', () => {
+    const result = parseDefinitionBundleJsonWithDiagnostics(JSON.stringify({
+      id: 'pkistudio.example.invalid',
+      version: 1,
+      label: '',
+      schema: { format: 'unsupported' },
+      entries: [{ id: 1, uiProfile: [] }]
+    }));
+
+    expect(result.bundle).toBeUndefined();
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ severity: 'error', code: 'invalid-string', path: ['version'] }),
+      expect.objectContaining({ severity: 'error', code: 'invalid-string', path: ['label'] }),
+      expect.objectContaining({ severity: 'error', code: 'invalid-schema-format', path: ['schema', 'format'] }),
+      expect.objectContaining({ severity: 'error', code: 'invalid-string', path: ['entries', '0', 'id'] }),
+      expect.objectContaining({ severity: 'error', code: 'missing-string', path: ['entries', '0', 'typeName'] }),
+      expect.objectContaining({ severity: 'error', code: 'expected-object', path: ['entries', '0', 'uiProfile'] })
+    ]));
+  });
+
+  it('validates Definition Bundle values directly', () => {
+    expect(validateDefinitionBundle({ ...bundle, entries: [] })).toEqual([
+      expect.objectContaining({ severity: 'error', code: 'missing-entry', path: ['entries'] })
+    ]);
+  });
+
   it('rejects Definition Bundle JSON with missing required fields', () => {
     expect(() => parseDefinitionBundleJson(JSON.stringify({
       id: 'pkistudio.example.invalid',
@@ -104,10 +130,16 @@ describe('Definition Bundle helpers', () => {
       label: 'Invalid Bundle',
       schema: { format: 'asn1', source: 'Example DEFINITIONS ::= BEGIN Person ::= UTF8String END' },
       entries: [{}]
-    }), 'invalid.definition-bundle.json')).toThrow('invalid.definition-bundle.json.entries[0].typeName must be a non-empty string.');
+    }), 'invalid.definition-bundle.json')).toThrow('invalid.definition-bundle.json missing-string at entries.0.typeName');
   });
 
   it('rejects malformed Definition Bundle JSON', () => {
-    expect(() => parseDefinitionBundleJson('{', 'broken.definition-bundle.json')).toThrow('broken.definition-bundle.json is not valid JSON');
+    const result = parseDefinitionBundleJsonWithDiagnostics('{');
+
+    expect(result.bundle).toBeUndefined();
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ severity: 'error', code: 'invalid-json', path: [] })
+    ]);
+    expect(() => parseDefinitionBundleJson('{', 'broken.definition-bundle.json')).toThrow('broken.definition-bundle.json invalid-json');
   });
 });

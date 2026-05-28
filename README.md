@@ -113,10 +113,12 @@ await app.build(false);
 Hosts can also pass an initial Schema Model and instance input, call
 `loadSchema(schema)` and `loadInput(input)`, or load a Definition Bundle with
 `loadBundle(bundle, entryIdOrTypeName?)` on the returned app instance. The app
-entry also exports the `DefinitionBundle` and `UiProfile` TypeScript types. In
-the browser app, `Load` -> `Definition Bundle` loads `.definition-bundle.json`
-or `.bundle.json` files through the same bundle path used by host integrations
-and built-in NamedObjects.
+entry also exports the `DefinitionBundle`, `DefinitionBundleDiagnostic`, and
+`UiProfile` TypeScript types, plus `validateDefinitionBundle()` and
+`parseDefinitionBundleJsonWithDiagnostics()` helpers. In the browser app,
+`Load` -> `Definition Bundle` loads `.definition-bundle.json` or `.bundle.json`
+files through the same bundle path used by host integrations and built-in
+NamedObjects.
 
 ```ts
 import type { DefinitionBundle } from '@pkistudio/asn1instancebuilder/app';
@@ -183,6 +185,16 @@ const schemaModelBundle: DefinitionBundle = {
 app.loadBundle(schemaModelBundle);
 ```
 
+Hosts can validate external bundle JSON before loading it:
+
+```ts
+import { parseDefinitionBundleJsonWithDiagnostics } from '@pkistudio/asn1instancebuilder/app';
+
+const result = parseDefinitionBundleJsonWithDiagnostics(bundleJsonText);
+if (result.bundle) app.loadBundle(result.bundle);
+else console.warn(result.diagnostics);
+```
+
 The built-in `Load` -> `NamedObjects` examples are also exported as reusable
 Definition Bundles:
 
@@ -197,14 +209,14 @@ UI Profiles only describe the input experience. Schema diagnostics, instance
 diagnostics, and DER generation continue to use the Schema Model and Instance
 JSON as the source of truth.
 
-The `DefinitionBundle` and `UiProfile` types are host-facing app API contracts
-for `@pkistudio/asn1instancebuilder/app`. In the 0.x series they may gain
-additional optional fields, but existing fields are intended to remain
-compatible. Bundle `version` describes the bundle payload format, not the npm
-package version. Unknown bundle or profile fields are ignored by the current app
-helpers so hosts can attach private metadata. When both `sampleInput` and
-`defaultInput` are present for an entry type, `sampleInput` is loaded first;
-`defaultInput` is the fallback starting value.
+The `DefinitionBundle`, `DefinitionBundleDiagnostic`, and `UiProfile` types are
+host-facing app API contracts for `@pkistudio/asn1instancebuilder/app`. In the
+0.x series they may gain additional optional fields, but existing fields are
+intended to remain compatible. Bundle `version` describes the bundle payload
+format, not the npm package version. Unknown bundle or profile fields are
+ignored by the current app helpers so hosts can attach private metadata. When
+both `sampleInput` and `defaultInput` are present for an entry type,
+`sampleInput` is loaded first; `defaultInput` is the fallback starting value.
 
 See `fixtures/person.definition-bundle.json` for a complete raw ASN.1 bundle
 example that can be loaded from `Load` -> `Definition Bundle`.
