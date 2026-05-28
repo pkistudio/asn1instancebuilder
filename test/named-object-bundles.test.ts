@@ -36,4 +36,39 @@ describe('NamedObjects Definition Bundle catalog', () => {
       expect(bundle.schema.source).toContain('DEFINITIONS');
     }
   });
+
+  it('attaches a UI Profile to the Certificate primary entry', () => {
+    const certificateBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'certificate');
+    const certificateEntry = certificateBundle ? findDefinitionBundleEntry(certificateBundle, 'certificate') : undefined;
+
+    expect(certificateEntry?.uiProfile?.id).toBe('pkistudio.named-object.certificate.ui-profile');
+    expect(certificateEntry?.uiProfile?.typeName).toBe('Certificate');
+    expect(certificateEntry?.uiProfile?.fields?.tbsCertificate).toMatchObject({
+      label: 'TBSCertificate',
+      description: 'Signed certificate body.',
+      order: 0
+    });
+    expect(certificateEntry?.uiProfile?.fields?.['tbsCertificate.issuer']).toMatchObject({
+      label: 'Issuer',
+      collapsed: true,
+      order: 3
+    });
+    expect(certificateEntry?.uiProfile?.fields?.['tbsCertificate.subjectPublicKeyInfo']).toMatchObject({
+      label: 'Subject public key info',
+      collapsed: true,
+      order: 6
+    });
+    expect(certificateEntry?.uiProfile?.fields?.['signatureValue.bytes']).toMatchObject({
+      label: 'Signature bytes',
+      inputMode: 'hex'
+    });
+  });
+
+  it('does not attach the Certificate UI Profile to child sample entries', () => {
+    const certificateBundle = namedObjectDefinitionBundles.find((bundle) => bundle.id === 'certificate');
+    const tbsCertificateEntry = certificateBundle ? findDefinitionBundleEntry(certificateBundle, 'TBSCertificate') : undefined;
+
+    expect(tbsCertificateEntry?.sampleInput).toBeDefined();
+    expect(tbsCertificateEntry?.uiProfile).toBeUndefined();
+  });
 });
