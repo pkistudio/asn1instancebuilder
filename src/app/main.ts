@@ -1,5 +1,5 @@
 import { createInstance, parseAsn1Definition, parseGeneratedDer, resolveDefinedType, validateInstance, validateSchemaModule, type Asn1SchemaModule, type Asn1Type, type InstanceDiagnostic, type SchemaDiagnostic } from '../core.js';
-import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, parseDefinitionBundleJsonWithDiagnostics, type DefinitionBundle, type DefinitionBundleDiagnostic } from './definition-bundle.js';
+import { findDefinitionBundleEntry, getDefinitionBundleSampleInputs, getDefinitionBundleUiProfiles, isRawAsn1BundleSchemaSource, parseDefinitionBundleJsonWithDiagnostics, validateDefinitionBundle, type DefinitionBundle, type DefinitionBundleDiagnostic } from './definition-bundle.js';
 import { createDefaultInput, findChoiceAlternative, getValueAtPath, parseFormPath, removeValueAtPath, setFormControlValue, setValueAtPath } from './form-model.js';
 import { readFormControlValue, renderInputForm, updateInputModeButtons, type InputMode } from './form-renderer.js';
 import { namedObjectDefinitionBundles } from './named-object-bundles.js';
@@ -456,7 +456,15 @@ export function initAsn1InstanceBuilder(options: Asn1InstanceBuilderAppOptions):
   saveDefinitionBundleFileButton.addEventListener('click', () => {
     try {
       const bundle = createDefinitionBundleFromWorkspace(definitionText.value, inputText.value, typeSelect.value, activeUiProfiles?.[typeSelect.value], activeDefinitionBundle, activeDefinitionBundleEntry);
+      const diagnostics = validateDefinitionBundle(bundle);
+      if (hasDiagnosticErrors(diagnostics)) {
+        renderDiagnostics(diagnosticsList, [{ title: 'Definition Bundle', diagnostics }]);
+        definitionStatus.textContent = `Could not save Definition Bundle: ${formatDiagnosticSummary(diagnostics)}`;
+        appendApiLog(apiLog, apiLogEntries, { level: 'error', label: 'validateExportedDefinitionBundle', detail: formatDiagnosticSummary(diagnostics) });
+        return;
+      }
       saveTextFile(JSON.stringify(bundle, null, 2), `${sanitizeFileName(bundle.id)}.definition-bundle.json`);
+      appendApiLog(apiLog, apiLogEntries, { level: diagnostics.length > 0 ? 'warning' : 'success', label: 'validateExportedDefinitionBundle', detail: `${bundle.id}: ${formatDiagnosticSummary(diagnostics)}` });
       appendApiLog(apiLog, apiLogEntries, { level: 'success', label: 'saveDefinitionBundle', detail: `Saved ${bundle.id} as a Definition Bundle.` });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
