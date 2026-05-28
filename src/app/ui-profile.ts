@@ -41,12 +41,13 @@ export interface UiFieldProfile {
  *
  * UI Profiles decorate generated forms but do not change schema validation,
  * instance validation, or DER generation. Field keys use normalized form paths,
- * such as "subject.name" or "extensions.0.extnValue".
+ * such as "subject.name" or "extensions.0.extnValue". Repeated item templates
+ * may use "*" for numeric array indexes, such as "extensions.*.extnValue".
  */
 export interface UiProfile {
   id: string;
   typeName: string;
-  /** Field profiles keyed by normalized form paths such as "subject.name" or "extensions.0.extnValue". */
+  /** Field profiles keyed by normalized form paths such as "subject.name", "extensions.0.extnValue", or "extensions.*.extnValue". */
   fields?: Record<string, UiFieldProfile>;
 }
 
@@ -56,5 +57,17 @@ export function normalizeUiFieldPath(path: UiFieldPath): string {
 }
 
 export function getUiFieldProfile(profile: UiProfile | undefined, path: UiFieldPath): UiFieldProfile | undefined {
-  return profile?.fields?.[normalizeUiFieldPath(path)];
+  if (!profile?.fields) return undefined;
+  const normalizedPath = normalizeUiFieldPath(path);
+  return profile.fields[normalizedPath] ?? profile.fields[normalizeUiFieldTemplatePath(path)];
+}
+
+function normalizeUiFieldTemplatePath(path: UiFieldPath): string {
+  const normalizedPath = normalizeUiFieldPath(path);
+  if (typeof path === 'string') return normalizedPath.split('.').map((segment) => isArrayIndexSegment(segment) ? '*' : segment).join('.');
+  return path.map((segment) => typeof segment === 'number' ? '*' : String(segment)).join('.');
+}
+
+function isArrayIndexSegment(segment: string): boolean {
+  return /^(0|[1-9]\d*)$/.test(segment);
 }
