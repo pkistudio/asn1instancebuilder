@@ -32,8 +32,8 @@
 - npm publish command in workflow: `npm publish --provenance --access public`
 - npm publication requires explicit user approval.
 - GitHub Release requires explicit user approval.
+- GitHub Release title/name pattern: `<version>`.
 - Stable published tags should have a GitHub Release marked as latest unless the user instructs otherwise.
-- GitHub Release name pattern: `<tag>` only, such as `v0.1.7`. Do not prefix the product name.
 - WordPress post workflow: `.github/workflows/publish-release-to-wordpress.yml`
 - WordPress post title pattern: `ASN.1 Instance Builder <tag> をリリースしました`
 
@@ -41,6 +41,7 @@
 
 - Pages workflow: `.github/workflows/pages.yml`
 - Pages artifact path: `dist/app-shell`
+- Wiki source path in repository: `wikisrc/`
 - Wiki path in Codespaces: `/workspaces/asn1instancebuilder.wiki`
 - Keep Wiki work separate from main repository work unless explicitly requested.
 
